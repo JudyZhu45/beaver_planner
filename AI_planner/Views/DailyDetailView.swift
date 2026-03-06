@@ -67,14 +67,9 @@ struct DailyDetailView: View {
                 // Time-block list
                 ScrollView {
                     if tasks.isEmpty {
-                        EmptyStateView(
-                            icon: "calendar.badge.plus",
-                            title: "No events scheduled",
-                            subtitle: "Add an event to get started",
-                            assetImage: "beaver-empty",
-                            buttonTitle: "Add Event",
-                            onAction: { showAddEventSheet = true }
-                        )
+                        EmptyStateView(type: .calendar) {
+                            showAddEventSheet = true
+                        }
                     } else {
                         VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
                             ForEach(tasks, id: \.id) { task in

@@ -250,13 +250,7 @@ struct SelectedDayPreviewView: View {
             }
             
             if tasks.isEmpty {
-                EmptyStateView(
-                    icon: "calendar.badge.plus",
-                    title: "No events scheduled",
-                    subtitle: "Tap \"View All\" to add events for this day",
-                    assetImage: "beaver-empty",
-                    compact: true
-                )
+                EmptyStateView(type: .calendar) { }
                 .background(AppTheme.bgTertiary)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
             } else {

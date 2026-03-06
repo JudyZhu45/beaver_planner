@@ -236,15 +236,9 @@ struct TodayView: View {
 
                     // Empty State
                     if todayScheduledEvents.isEmpty && todayTodos.isEmpty {
-                        EmptyStateView(
-                            icon: "sparkles",
-                            title: "No tasks for today",
-                            subtitle: "Start planning your day by adding events or tasks",
-                            assetImage: "beaver-empty",
-                            buttonTitle: "Add Event",
-                            onAction: { showAddEventSheet = true },
-                            smartSuggestions: SmartSuggestionGenerator.generateSuggestions(tasks: viewModel.todos)
-                        )
+                        EmptyStateView(type: .tasks) {
+                            showAddEventSheet = true
+                        }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }

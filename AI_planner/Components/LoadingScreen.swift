@@ -53,7 +53,7 @@ struct LoadingScreen: View {
                     Text("🦫")
                         .font(.system(size: 72))
                         .offset(y: beaverOffset)
-                        .rotationEffect(.degrees(sin(beaverOffset * 0.5) * 5))
+                        .rotationEffect(.degrees(sin(Double(beaverOffset) * 0.5) * 5))
                     
                     // Sparkles
                     HStack(spacing: 40) {
