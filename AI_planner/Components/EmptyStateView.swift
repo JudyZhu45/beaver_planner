@@ -2,207 +2,210 @@
 //  EmptyStateView.swift
 //  AI_planner
 //
-//  Created by Judy459 on 2/24/26.
+//  Created by AI Assistant on 3/5/26.
 //
 
 import SwiftUI
 
-struct EmptyStateView: View {
+enum EmptyStateType {
+    case tasks
+    case calendar
+    case analytics
+    case notifications
+    
+    var config: EmptyStateConfig {
+        switch self {
+        case .tasks:
+            return EmptyStateConfig(
+                icon: "🦫",
+                title: "今天还没有任务呢",
+                description: "海狸已经准备好了，添加第一个任务开始吧！",
+                actionText: "添加任务",
+                tip: "💡 小贴士：把大任务拆成小步骤，更容易完成哦"
+            )
+        case .calendar:
+            return EmptyStateConfig(
+                icon: "📅",
+                title: "日历空空如也",
+                description: "规划你的时间，让每一天都充实起来",
+                actionText: "创建日程",
+                tip: "💡 小贴士：在高效时段安排重要任务"
+            )
+        case .analytics:
+            return EmptyStateConfig(
+                icon: "📊",
+                title: "数据还在积累中",
+                description: "使用一段时间后，这里会显示你的效率分析",
+                actionText: "去添加任务",
+                tip: "💡 小贴士：坚持记录，AI 会更懂你"
+            )
+        case .notifications:
+            return EmptyStateConfig(
+                icon: "🔔",
+                title: "没有新通知",
+                description: "海狸帮你盯着呢，有重要消息会第一时间告诉你",
+                actionText: "查看设置",
+                tip: "💡 小贴士：可以在设置里调整通知偏好"
+            )
+        }
+    }
+}
+
+struct EmptyStateConfig {
     let icon: String
     let title: String
-    let subtitle: String
-    var assetImage: String? = nil
-    var buttonTitle: String? = nil
-    var onAction: (() -> Void)? = nil
-    var compact: Bool = false
-    var smartSuggestions: [SmartSuggestion]? = nil
+    let description: String
+    let actionText: String
+    let tip: String
+}
+
+struct EmptyStateView: View {
+    let type: EmptyStateType
+    let action: () -> Void
+    
+    @State private var isAnimating = false
+    @State private var floatOffset: CGFloat = 0
+    
+    private var config: EmptyStateConfig { type.config }
     
     var body: some View {
-        VStack(spacing: compact ? AppTheme.Spacing.md : AppTheme.Spacing.lg) {
-            if let assetImage {
-                Image(assetImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: compact ? 60 : 80, height: compact ? 60 : 80)
-            } else {
-                Image(systemName: icon)
-                    .font(.system(size: compact ? 36 : 48, weight: .light))
-                    .foregroundColor(AppTheme.secondaryTeal.opacity(0.4))
-            }
+        VStack(spacing: 20) {
+            Spacer()
             
-            VStack(spacing: AppTheme.Spacing.sm) {
-                Text(title)
-                    .font(compact ? AppTheme.Typography.bodyMedium : AppTheme.Typography.headlineSmall)
-                    .foregroundColor(AppTheme.textPrimary)
+            // Animated illustration
+            ZStack {
+                // Background glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                AppTheme.primaryDeepIndigo.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
                 
-                Text(subtitle)
-                    .font(AppTheme.Typography.bodySmall)
+                // Main icon with bounce
+                Text(config.icon)
+                    .font(.system(size: 64))
+                    .offset(y: floatOffset)
+                
+                // Floating sparkles
+                HStack(spacing: 50) {
+                    Text("✨")
+                        .font(.title3)
+                        .opacity(isAnimating ? 1 : 0.5)
+                        .offset(y: isAnimating ? -5 : 0)
+                    
+                    Spacer().frame(width: 60)
+                    
+                    Text("💭")
+                        .font(.callout)
+                        .opacity(isAnimating ? 0.8 : 0.4)
+                        .offset(y: isAnimating ? -3 : 3)
+                }
+            }
+            .frame(height: 100)
+            
+            // Title
+            Text(config.title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+            
+            // Description
+            Text(config.description)
+                .font(.subheadline)
+                .foregroundColor(AppTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            
+            // Action button
+            Button(action: action) {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                    
+                    Text(config.actionText)
+                        .font(.system(size: 15, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.831, green: 0.647, blue: 0.455),
+                            Color(red: 0.769, green: 0.584, blue: 0.416)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+                .shadow(
+                    color: AppTheme.primaryDeepIndigo.opacity(0.25),
+                    radius: 8,
+                    x: 0,
+                    y: 4
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .padding(.top, 8)
+            
+            // Tip box
+            HStack(spacing: 8) {
+                Text(config.tip)
+                    .font(.caption)
                     .foregroundColor(AppTheme.textSecondary)
-                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(AppTheme.bgElevated)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(AppTheme.borderColor, lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
             
-            // Smart suggestions based on user behavior
-            if let smartSuggestions, !smartSuggestions.isEmpty {
-                VStack(spacing: AppTheme.Spacing.sm) {
-                    ForEach(smartSuggestions) { suggestion in
-                        HStack(spacing: AppTheme.Spacing.sm) {
-                            Image(systemName: suggestion.icon)
-                                .font(.system(size: 12))
-                                .foregroundColor(suggestion.color)
-                                .frame(width: 20)
-                            
-                            Text(suggestion.text)
-                                .font(AppTheme.Typography.bodySmall)
-                                .foregroundColor(AppTheme.textSecondary)
-                            
-                            Spacer()
-                        }
-                    }
-                }
-                .padding(AppTheme.Spacing.md)
-                .background(AppTheme.primaryDeepIndigo.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
-                .padding(.horizontal, AppTheme.Spacing.lg)
-            }
-            
-            if let buttonTitle, let onAction {
-                Button(action: onAction) {
-                    Text(buttonTitle)
-                        .font(AppTheme.Typography.titleMedium)
-                        .foregroundColor(AppTheme.textInverse)
-                        .padding(.horizontal, AppTheme.Spacing.xxl)
-                        .padding(.vertical, AppTheme.Spacing.md)
-                        .background(AppTheme.secondaryTeal)
-                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
-                }
-                .padding(.top, AppTheme.Spacing.sm)
-            }
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, compact ? AppTheme.Spacing.lg : AppTheme.Spacing.huge)
+        .onAppear {
+            startAnimations()
+        }
+    }
+    
+    private func startAnimations() {
+        // Float animation
+        withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+            floatOffset = -8
+        }
+        
+        // Sparkle animation
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            isAnimating = true
+        }
     }
 }
 
-// MARK: - Smart Suggestion Model
-
-struct SmartSuggestion: Identifiable {
-    let id = UUID()
-    let icon: String
-    let text: String
-    let color: Color
-}
-
-// MARK: - Smart Suggestion Generator
-
-struct SmartSuggestionGenerator {
-    
-    /// Generate context-aware suggestions for empty states
-    static func generateSuggestions(tasks: [TodoTask]) -> [SmartSuggestion] {
-        var suggestions: [SmartSuggestion] = []
-        let hour = Calendar.current.component(.hour, from: Date())
-        let analyzer = BehaviorAnalyzer.shared
-        
-        // Time-based suggestion
-        let timeSuggestion = timeBasedSuggestion(hour: hour)
-        suggestions.append(timeSuggestion)
-        
-        // Behavior-based suggestion
-        let topHours = analyzer.topProductiveHours(days: 14)
-        if !topHours.isEmpty && topHours.contains(hour) {
-            suggestions.append(SmartSuggestion(
-                icon: "sparkles",
-                text: "This is usually your most productive hour!",
-                color: AppTheme.secondaryTeal
-            ))
-        }
-        
-        // Streak-based suggestion
-        let profile = UserProfileViewModel.shared.profile
-        if profile.streakData.currentStreak > 0 {
-            suggestions.append(SmartSuggestion(
-                icon: "flame.fill",
-                text: "\(profile.streakData.currentStreak)-day streak! Add a task to keep it going.",
-                color: AppTheme.accentCoral
-            ))
-        }
-        
-        // Type preference suggestion
-        let typeStats = analyzer.eventTypeAnalysis(days: 14)
-        if let topType = typeStats.max(by: { $0.totalCount < $1.totalCount }), topType.totalCount >= 3 {
-            suggestions.append(SmartSuggestion(
-                icon: "arrow.right.circle.fill",
-                text: "You often schedule \(topType.eventType.rawValue) tasks. Add one?",
-                color: AppTheme.primaryDeepIndigo
-            ))
-        }
-        
-        return Array(suggestions.prefix(3))
-    }
-    
-    private static func timeBasedSuggestion(hour: Int) -> SmartSuggestion {
-        switch hour {
-        case 5..<9:
-            return SmartSuggestion(
-                icon: "sunrise.fill",
-                text: "Morning is great for planning your day ahead.",
-                color: Color.orange
-            )
-        case 9..<12:
-            return SmartSuggestion(
-                icon: "cup.and.saucer.fill",
-                text: "Prime focus time — schedule your deep work now.",
-                color: AppTheme.secondaryTeal
-            )
-        case 12..<14:
-            return SmartSuggestion(
-                icon: "fork.knife",
-                text: "Lunch break — plan your afternoon tasks.",
-                color: AppTheme.primaryDeepIndigo
-            )
-        case 14..<18:
-            return SmartSuggestion(
-                icon: "bolt.fill",
-                text: "Afternoon push — tackle your remaining priorities.",
-                color: Color.orange
-            )
-        case 18..<22:
-            return SmartSuggestion(
-                icon: "moon.stars.fill",
-                text: "Evening — review today and plan for tomorrow.",
-                color: AppTheme.primaryDeepIndigo
-            )
-        default:
-            return SmartSuggestion(
-                icon: "bed.double.fill",
-                text: "It's late — rest well and plan tomorrow morning.",
-                color: AppTheme.textTertiary
-            )
-        }
+// Custom button style for scale effect
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
 #Preview {
-    VStack(spacing: 32) {
-        EmptyStateView(
-            icon: "sparkles",
-            title: "No tasks for today",
-            subtitle: "Tap the + button to add an event or task",
-            buttonTitle: "Add Event",
-            onAction: {},
-            smartSuggestions: [
-                SmartSuggestion(icon: "sunrise.fill", text: "Morning is great for planning.", color: .orange),
-                SmartSuggestion(icon: "flame.fill", text: "3-day streak! Add a task to keep going.", color: .red)
-            ]
-        )
-        
-        Divider()
-        
-        EmptyStateView(
-            icon: "calendar.badge.plus",
-            title: "No events scheduled",
-            subtitle: "Plan your day by adding events",
-            compact: true
-        )
+    VStack(spacing: 20) {
+        EmptyStateView(type: .tasks, action: {})
     }
-    .padding()
+    .background(AppTheme.bgPrimary)
 }
