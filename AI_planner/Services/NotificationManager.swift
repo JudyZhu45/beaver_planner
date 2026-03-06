@@ -97,4 +97,131 @@ class NotificationManager {
             scheduleNotification(for: task)
         }
     }
+    
+    // MARK: - Smart Suggestion Notifications
+    
+    private let dailySuggestionKey = "LastDailySuggestionDate"
+    private let maxDailySuggestions = 3
+    private var dailySuggestionCount = 0
+    
+    /// Schedule a morning planning suggestion based on user's typical open time
+    func scheduleMorningSuggestion(tasks: [TodoTask]) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        // Don't schedule if already sent today
+        if let lastDate = UserDefaults.standard.object(forKey: dailySuggestionKey) as? Date,
+           calendar.isDate(lastDate, inSameDayAs: today) {
+            return
+        }
+        
+        let todayTasks = tasks.filter {
+            !$0.isCompleted && calendar.isDate($0.dueDate, inSameDayAs: today)
+        }
+        guard !todayTasks.isEmpty else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Today's Plan"
+        content.body = "You have \(todayTasks.count) tasks today. Start with the most important one!"
+        content.sound = .default
+        
+        // Schedule for user's typical open time minus 5 min, or 8:00 AM default
+        let profile = UserProfileViewModel.shared.profile
+        let openHour = profile.avgAppOpenHour ?? 8
+        let fireHour = max(6, openHour)
+        
+        guard let fireDate = calendar.date(bySettingHour: fireHour, minute: 0, second: 0, of: today),
+              fireDate > Date() else {
+            UserDefaults.standard.set(today, forKey: dailySuggestionKey)
+            return
+        }
+        
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        
+        let request = UNNotificationRequest(
+            identifier: "morning_suggestion_\(today.timeIntervalSince1970)",
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request) { [weak self] error in
+            if error == nil {
+                UserDefaults.standard.set(today, forKey: self?.dailySuggestionKey ?? "")
+            }
+        }
+    }
+    
+    /// Schedule overdue task reminder
+    func scheduleOverdueReminder(tasks: [TodoTask]) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        let overdueTasks = tasks.filter {
+            !$0.isCompleted && $0.dueDate < today
+        }
+        guard overdueTasks.count >= 2 else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Tasks Need Attention"
+        content.body = "You have \(overdueTasks.count) overdue tasks. Would you like to reschedule them?"
+        content.sound = .default
+        
+        // Schedule for 2 PM today
+        guard let fireDate = calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date()),
+              fireDate > Date() else { return }
+        
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        
+        let request = UNNotificationRequest(
+            identifier: "overdue_reminder_\(today.timeIntervalSince1970)",
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request)
+    }
+    
+    /// Schedule a productivity peak reminder
+    func schedulePeakHourReminder(tasks: [TodoTask]) {
+        let profile = UserProfileViewModel.shared.profile
+        guard !profile.peakProductivityHours.isEmpty else { return }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let peakHour = profile.peakProductivityHours[0]
+        
+        // Check if there are important uncompleted tasks
+        let importantTasks = tasks.filter {
+            !$0.isCompleted && calendar.isDate($0.dueDate, inSameDayAs: today) && $0.priority == .high
+        }
+        guard !importantTasks.isEmpty else { return }
+        
+        guard let fireDate = calendar.date(bySettingHour: peakHour, minute: 0, second: 0, of: Date()),
+              fireDate > Date() else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Peak Productivity Time"
+        content.body = "Now is your most productive hour! You have \(importantTasks.count) important tasks to tackle."
+        content.sound = .default
+        
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        
+        let request = UNNotificationRequest(
+            identifier: "peak_hour_\(today.timeIntervalSince1970)",
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request)
+    }
+    
+    /// Schedule all smart notifications for the day
+    func scheduleSmartNotifications(tasks: [TodoTask]) {
+        scheduleMorningSuggestion(tasks: tasks)
+        scheduleOverdueReminder(tasks: tasks)
+        schedulePeakHourReminder(tasks: tasks)
+    }
 }

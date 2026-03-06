@@ -109,12 +109,21 @@ class ChatService: ObservableObject {
         
         let tasksContext = buildSmartContext(userMessage: userMessage)
         let conflictContext = buildConflictContext()
+        let userProfileSummary = BehaviorAnalyzer.shared.generateProfileSummary(days: 30)
+        let beaverPersona = BeaverPersonality.shared.personaPrompt(tasks: todoViewModel?.todos ?? [])
+        let chatMemory = ChatMemoryStore.shared.generateMemorySummary()
         
         return """
-        你是一个集成在任务管理App中的智能日程规划助手。你可以自然对话，也可以直接管理用户的任务。
+        \(beaverPersona)
+        
+        你同时也是一个集成在任务管理App中的智能日程规划助手。你可以自然对话，也可以直接管理用户的任务。
 
         当前日期: \(today) (\(weekday))
         当前时间: \(currentTime)
+
+        ## 用户行为画像
+        \(userProfileSummary)
+        \(chatMemory.isEmpty ? "" : "\n        \(chatMemory)")
 
         ## 你的能力
         1. 自然对话：回答问题、给建议
@@ -209,6 +218,10 @@ class ChatService: ObservableObject {
         - 规划日程时，任务之间要留合理的休息/通勤时间
         - 检查已有任务，避免时间冲突
         - 如果用户请求模糊不清，先询问细节再规划
+        - 参考用户画像中的高效时段和习惯，优先在高效时段安排重要任务
+        - 如果用户画像显示某类任务有拖延倾向，给出温和提醒
+        - 严格遵守用户偏好记忆中的约束和偏好（如"不喜欢早起"就不安排早上的任务）
+        - 当用户表达新的偏好或习惯时，自然地确认并记住
         """
     }
     
@@ -451,6 +464,9 @@ class ChatService: ObservableObject {
             
             // NEW: Update recently mentioned tasks
             updateRecentlyMentionedTasks(from: fullResponse)
+            
+            // Extract user preferences from conversation for long-term memory
+            ChatMemoryStore.shared.extractPreferences(from: userMessage, aiResponse: fullResponse)
             
             // Update streaming text one final time (clean version)
             streamingText = stripHiddenBlocks(from: fullResponse)

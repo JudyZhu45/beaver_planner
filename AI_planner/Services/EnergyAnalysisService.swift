@@ -18,16 +18,18 @@ struct EnergyProfile {
     let peakHour: Int                  // Hour with highest energy
     let valleyHour: Int                // Hour with lowest energy
     let hasSufficientData: Bool        // Need at least 5 completed tasks with timestamps
+    let efficientSlots: [Int]          // Top 3 most efficient hours
+    let procrastinationSlots: [Int]    // Top 3 procrastination-prone hours
 }
 
 class EnergyAnalysisService {
     
-    /// Build energy profile from historical task completions
+    /// Build energy profile from historical task completions + behavior data
     static func buildProfile(from tasks: [TodoTask]) -> EnergyProfile {
         let completedTasks = tasks.filter { $0.completedAt != nil }
         let hasSufficientData = completedTasks.count >= 5
         
-        // Build hourly histogram with priority weighting
+        // Build hourly histogram with priority weighting from tasks
         var hourlyScores = Array(repeating: 0.0, count: 24)
         let calendar = Calendar.current
         
@@ -39,6 +41,21 @@ class EnergyAnalysisService {
                 case .high: return 3.0
                 case .medium: return 2.0
                 case .low: return 1.0
+                }
+            }()
+            hourlyScores[hour] += weight
+        }
+        
+        // Integrate behavior store data for richer analysis
+        let behaviorCompletions = UserBehaviorStore.shared.records(ofType: .taskCompleted)
+        for record in behaviorCompletions {
+            let hour = record.context?.actualCompletionHour ?? record.hourOfDay
+            let weight: Double = {
+                switch record.priority {
+                case .high: return 1.5
+                case .medium: return 1.0
+                case .low: return 0.5
+                case .none: return 0.5
                 }
             }()
             hourlyScores[hour] += weight
@@ -78,11 +95,19 @@ class EnergyAnalysisService {
         let peakHour = wakingRange.max(by: { normalized[$0] < normalized[$1] }) ?? 12
         let valleyHour = wakingRange.min(by: { normalized[$0] < normalized[$1] }) ?? 6
         
+        // Efficient slots: top 3 hours with highest completion scores
+        let efficientSlots = Array((6...22).sorted { normalized[$0] > normalized[$1] }.prefix(3))
+        
+        // Procrastination slots from behavior data
+        let procrastinationSlots = BehaviorAnalyzer.shared.procrastinationHours(days: 30)
+        
         return EnergyProfile(
             dataPoints: dataPoints,
             peakHour: peakHour,
             valleyHour: valleyHour,
-            hasSufficientData: hasSufficientData
+            hasSufficientData: hasSufficientData,
+            efficientSlots: efficientSlots,
+            procrastinationSlots: procrastinationSlots
         )
     }
 }

@@ -12,6 +12,7 @@ import AWSCognitoAuthPlugin
 @main
 struct AI_plannerApp: App {
     @State private var authManager = AuthManager()
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     init() {
         configureAmplify()
@@ -38,13 +39,20 @@ struct AI_plannerApp: App {
                         }
                     }
                 } else if authManager.isSignedIn {
-                    ContentView(authManager: authManager)
+                    if hasCompletedOnboarding {
+                        ContentView(authManager: authManager)
+                    } else {
+                        OnboardingView {
+                            hasCompletedOnboarding = true
+                        }
+                    }
                 } else {
                     LoginView(authManager: authManager)
                 }
             }
             .task {
                 _ = await NotificationManager.shared.requestAuthorization()
+                UserBehaviorStore.shared.recordAppOpened()
             }
         }
     }

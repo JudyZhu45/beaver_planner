@@ -15,6 +15,7 @@ struct TodayView: View {
     @State private var taskToDelete: TodoTask?
     @State private var showDeleteConfirmation = false
     @State private var showSwipeHint: Bool = !UserDefaults.standard.bool(forKey: "hasShownSwipeHint")
+    @State private var insights: [InsightCard] = []
     
     // Get today's scheduled events (with time)
     var todayScheduledEvents: [TodoTask] {
@@ -67,6 +68,17 @@ struct TodayView: View {
                         .font(AppTheme.Typography.headlineLarge)
                         .foregroundColor(AppTheme.primaryDeepIndigo)
                     
+                    // Dynamic beaver greeting
+                    let greeting = BeaverPersonality.shared.greeting(tasks: viewModel.todos)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(greeting.text)
+                            .font(AppTheme.Typography.titleMedium)
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text(greeting.subtitle)
+                            .font(AppTheme.Typography.bodySmall)
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    
                     // Progress Bar
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
                         HStack {
@@ -109,6 +121,23 @@ struct TodayView: View {
                 .padding(AppTheme.Spacing.lg)
                 .background(AppTheme.bgSecondary)
                 .shadow(color: AppTheme.shadowColor, radius: 4, x: 0, y: 2)
+                
+                // Insight Cards
+                if !insights.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: AppTheme.Spacing.md) {
+                            ForEach(insights) { insight in
+                                InsightCardView(insight: insight) {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        insights.removeAll { $0.id == insight.id }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, AppTheme.Spacing.lg)
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                    }
+                }
                 
                 // Use a List here so swipeActions work reliably on rows (left-swipe to reveal delete)
                 List {
@@ -174,12 +203,11 @@ struct TodayView: View {
                                     onDelete: {
                                         taskToDelete = task
                                         showDeleteConfirmation = true
+                                    },
+                                    onEdit: {
+                                        editingTodo = task
                                     }
                                 )
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    editingTodo = task
-                                }
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -214,7 +242,8 @@ struct TodayView: View {
                             subtitle: "Start planning your day by adding events or tasks",
                             assetImage: "beaver-empty",
                             buttonTitle: "Add Event",
-                            onAction: { showAddEventSheet = true }
+                            onAction: { showAddEventSheet = true },
+                            smartSuggestions: SmartSuggestionGenerator.generateSuggestions(tasks: viewModel.todos)
                         )
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -224,6 +253,10 @@ struct TodayView: View {
                 .scrollContentBackground(.hidden)
                 .padding(.top, AppTheme.Spacing.lg)
             }
+        }
+        .onAppear {
+            insights = InsightGenerator.shared.generateInsights(tasks: viewModel.todos)
+            UserProfileViewModel.shared.rebuildProfile(tasks: viewModel.todos)
         }
         .sheet(isPresented: $showAddEventSheet) {
             AddEventSheet(viewModel: viewModel, isPresented: $showAddEventSheet)
@@ -264,6 +297,54 @@ struct TodayView: View {
         } message: {
             Text("This action cannot be undone.")
         }
+    }
+}
+
+// MARK: - Insight Card View
+
+struct InsightCardView: View {
+    let insight: InsightCard
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+            HStack {
+                Image(systemName: insight.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(insight.color)
+                
+                Text(insight.title)
+                    .font(AppTheme.Typography.titleSmall)
+                    .foregroundColor(AppTheme.textPrimary)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(AppTheme.textTertiary)
+                        .padding(4)
+                        .background(AppTheme.bgTertiary)
+                        .clipShape(Circle())
+                }
+            }
+            
+            Text(insight.description)
+                .font(AppTheme.Typography.bodySmall)
+                .foregroundColor(AppTheme.textSecondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(AppTheme.Spacing.md)
+        .frame(width: 260)
+        .background(AppTheme.bgSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.Radius.md)
+                .stroke(insight.color.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: AppTheme.shadowColor, radius: 2, x: 0, y: 1)
     }
 }
 

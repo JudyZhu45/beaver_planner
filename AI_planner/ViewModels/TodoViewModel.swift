@@ -15,6 +15,7 @@ class TodoViewModel: ObservableObject {
     
     private let todosKey = "SavedTodos"
     private let calendarSync = CalendarSyncService.shared
+    private let behaviorStore = UserBehaviorStore.shared
     
     init() {
         loadTodos()
@@ -37,13 +38,15 @@ class TodoViewModel: ObservableObject {
         todos.append(newTodo)
         saveTodos()
         NotificationManager.shared.scheduleNotification(for: newTodo)
+        behaviorStore.recordTaskCreated(task: newTodo)
     }
     
     func updateTodo(_ todo: TodoTask) {
         if let index = todos.firstIndex(where: { $0.id == todo.id }) {
+            let oldTask = todos[index]
             var updatedTodo = todo
             // Track completion timestamp changes
-            let wasCompleted = todos[index].isCompleted
+            let wasCompleted = oldTask.isCompleted
             if updatedTodo.isCompleted && !wasCompleted {
                 updatedTodo.completedAt = Date()
             } else if !updatedTodo.isCompleted && wasCompleted {
@@ -52,6 +55,19 @@ class TodoViewModel: ObservableObject {
             if let eventId = calendarSync.saveToCalendar(updatedTodo) {
                 updatedTodo.calendarEventId = eventId
             }
+            
+            // Track which fields changed
+            var fieldsChanged: [String] = []
+            if oldTask.title != updatedTodo.title { fieldsChanged.append("title") }
+            if oldTask.startTime != updatedTodo.startTime { fieldsChanged.append("startTime") }
+            if oldTask.endTime != updatedTodo.endTime { fieldsChanged.append("endTime") }
+            if oldTask.dueDate != updatedTodo.dueDate { fieldsChanged.append("dueDate") }
+            if oldTask.priority != updatedTodo.priority { fieldsChanged.append("priority") }
+            if oldTask.eventType != updatedTodo.eventType { fieldsChanged.append("eventType") }
+            if !fieldsChanged.isEmpty {
+                behaviorStore.recordTaskUpdated(task: updatedTodo, fieldsChanged: fieldsChanged)
+            }
+            
             todos[index] = updatedTodo
             saveTodos()
             if updatedTodo.isCompleted {
@@ -64,6 +80,7 @@ class TodoViewModel: ObservableObject {
     
     func deleteTodo(at indexSet: IndexSet) {
         for index in indexSet {
+            behaviorStore.recordTaskDeleted(task: todos[index])
             calendarSync.removeFromCalendar(todos[index])
             NotificationManager.shared.cancelNotification(for: todos[index])
         }
@@ -77,6 +94,7 @@ class TodoViewModel: ObservableObject {
             todos[index].completedAt = todos[index].isCompleted ? Date() : nil
             saveTodos()
             if todos[index].isCompleted {
+                behaviorStore.recordTaskCompleted(task: todos[index])
                 NotificationManager.shared.cancelNotification(for: todos[index])
                 ToastManager.shared.show("Task completed", type: .success)
             } else {
@@ -97,11 +115,13 @@ class TodoViewModel: ObservableObject {
         todos.append(newTask)
         saveTodos()
         NotificationManager.shared.scheduleNotification(for: newTask)
+        behaviorStore.recordTaskCreated(task: newTask)
     }
     
     /// Delete a task by its UUID (used by AI chat service)
     func deleteTodoById(_ id: UUID) {
         if let index = todos.firstIndex(where: { $0.id == id }) {
+            behaviorStore.recordTaskDeleted(task: todos[index])
             calendarSync.removeFromCalendar(todos[index])
             NotificationManager.shared.cancelNotification(for: todos[index])
             todos.remove(at: index)

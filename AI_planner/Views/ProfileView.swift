@@ -13,6 +13,8 @@ struct ProfileView: View {
     @ObservedObject var viewModel: TodoViewModel
     @ObservedObject private var calendarSync = CalendarSyncService.shared
     @State private var notificationsEnabled = false
+    @StateObject private var achievementSystem = AchievementSystem.shared
+    @State private var showWeeklyReview = false
     
     // MARK: - Computed Stats
     
@@ -100,6 +102,15 @@ struct ProfileView: View {
                         // Statistics
                         statisticsSection
                         
+                        // Habit Heatmap
+                        HabitHeatmapView(tasks: viewModel.todos)
+                        
+                        // Beaver Commentary
+                        beaverCommentarySection
+                        
+                        // Achievements
+                        achievementsSection
+                        
                         // Energy Curve
                         energyCurveSection
                         
@@ -117,6 +128,10 @@ struct ProfileView: View {
         }
         .task {
             await checkNotificationStatus()
+            achievementSystem.updateProgress(tasks: viewModel.todos)
+        }
+        .sheet(isPresented: $showWeeklyReview) {
+            WeeklyReviewView(tasks: viewModel.todos)
         }
     }
     
@@ -162,8 +177,24 @@ struct ProfileView: View {
     
     private var statisticsSection: some View {
         VStack(spacing: AppTheme.Spacing.md) {
-            SectionHeader(title: "Statistics", icon: "chart.bar.fill")
-                .padding(.horizontal, AppTheme.Spacing.lg)
+            HStack {
+                SectionHeader(title: "Statistics", icon: "chart.bar.fill")
+                Spacer()
+                Button(action: { showWeeklyReview = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 12))
+                        Text("Weekly")
+                            .font(AppTheme.Typography.labelSmall)
+                    }
+                    .foregroundColor(AppTheme.secondaryTeal)
+                    .padding(.horizontal, AppTheme.Spacing.md)
+                    .padding(.vertical, AppTheme.Spacing.xs)
+                    .background(AppTheme.secondaryTeal.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.sm))
+                }
+            }
+            .padding(.horizontal, AppTheme.Spacing.lg)
             
             // 3-column stat cards
             HStack(spacing: AppTheme.Spacing.sm) {
@@ -309,6 +340,35 @@ struct ProfileView: View {
                 Divider()
                     .padding(.leading, 48)
                 
+                // Preferences row
+                NavigationLink {
+                    UserPreferencesView()
+                } label: {
+                    HStack(spacing: AppTheme.Spacing.md) {
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.primaryDeepIndigo)
+                            .frame(width: 28, height: 28)
+                            .background(AppTheme.primaryDeepIndigo.opacity(0.1))
+                            .clipShape(Circle())
+                        
+                        Text("My Preferences")
+                            .font(AppTheme.Typography.bodyMedium)
+                            .foregroundColor(AppTheme.textPrimary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.lg)
+                    .padding(.vertical, AppTheme.Spacing.md)
+                }
+                
+                Divider()
+                    .padding(.leading, 48)
+                
                 // About row
                 HStack(spacing: AppTheme.Spacing.md) {
                     Image(systemName: "info.circle.fill")
@@ -338,6 +398,167 @@ struct ProfileView: View {
                     .stroke(AppTheme.borderColor, lineWidth: 1)
             )
             .padding(.horizontal, AppTheme.Spacing.lg)
+        }
+    }
+    
+    // MARK: - Beaver Commentary
+    
+    private var beaverCommentarySection: some View {
+        let commentary = BeaverPersonality.shared.statsCommentary(
+            completionRate: completionRate,
+            streak: currentStreak,
+            completedCount: completedTasksCount
+        )
+        let tip = beaverProductivityTip
+        
+        return VStack(spacing: AppTheme.Spacing.md) {
+            // Main commentary
+            HStack(spacing: AppTheme.Spacing.md) {
+                Image("beaver-main")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Beaver says:")
+                        .font(AppTheme.Typography.labelSmall)
+                        .foregroundColor(AppTheme.textTertiary)
+                    
+                    Text(commentary)
+                        .font(AppTheme.Typography.bodyMedium)
+                        .foregroundColor(AppTheme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            
+            // Productivity tip based on user data
+            if let tip {
+                Divider()
+                
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    
+                    Text(tip)
+                        .font(AppTheme.Typography.bodySmall)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(AppTheme.Spacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.primaryDeepIndigo.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.Radius.lg)
+                .stroke(AppTheme.primaryDeepIndigo.opacity(0.12), lineWidth: 1)
+        )
+        .padding(.horizontal, AppTheme.Spacing.lg)
+    }
+    
+    /// Generate a data-driven productivity tip
+    private var beaverProductivityTip: String? {
+        let analyzer = BehaviorAnalyzer.shared
+        let topHours = analyzer.topProductiveHours(days: 30)
+        let procrastination = analyzer.procrastinationHours(days: 30)
+        
+        if !topHours.isEmpty {
+            let formattedHours = topHours.prefix(2).map { "\($0):00" }.joined(separator: " & ")
+            return "Your peak hours are around \(formattedHours). Try scheduling important tasks then!"
+        }
+        
+        if !procrastination.isEmpty {
+            let hour = procrastination.first!
+            return "You tend to postpone tasks around \(hour):00. Try breaking them into smaller steps."
+        }
+        
+        if completionRate < 0.5 && completedTasksCount > 0 {
+            return "Try starting with 2-3 small tasks to build momentum."
+        }
+        
+        if currentStreak == 0 && completedTasksCount > 0 {
+            return "Complete just one task today to restart your streak!"
+        }
+        
+        return nil
+    }
+    
+    // MARK: - Achievements Section
+    
+    private var achievementsSection: some View {
+        VStack(spacing: AppTheme.Spacing.md) {
+            HStack {
+                SectionHeader(title: "Achievements", icon: "trophy.fill")
+                Spacer()
+                Text("\(achievementSystem.unlockedCount)/\(achievementSystem.achievements.count)")
+                    .font(AppTheme.Typography.labelMedium)
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            
+            // Achievement grid
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: AppTheme.Spacing.md) {
+                ForEach(achievementSystem.achievements) { achievement in
+                    AchievementBadge(achievement: achievement)
+                }
+            }
+            .padding(AppTheme.Spacing.lg)
+            .background(AppTheme.bgSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppTheme.Radius.lg)
+                    .stroke(AppTheme.borderColor, lineWidth: 1)
+            )
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            
+            // Next achievement
+            if let next = achievementSystem.nextAchievement() {
+                HStack(spacing: AppTheme.Spacing.md) {
+                    Text(next.icon)
+                        .font(.system(size: 20))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Next: \(next.title)")
+                            .font(AppTheme.Typography.titleSmall)
+                            .foregroundColor(AppTheme.textPrimary)
+                        
+                        Text("\(next.currentProgress)/\(next.requirement) — \(next.description)")
+                            .font(AppTheme.Typography.labelSmall)
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    // Mini progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(AppTheme.bgTertiary)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(next.color)
+                                .frame(width: geo.size.width * next.progressRatio)
+                        }
+                    }
+                    .frame(width: 60, height: 6)
+                }
+                .padding(AppTheme.Spacing.md)
+                .background(AppTheme.bgSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.md)
+                        .stroke(AppTheme.borderColor, lineWidth: 1)
+                )
+                .padding(.horizontal, AppTheme.Spacing.lg)
+            }
         }
     }
     
@@ -448,6 +669,37 @@ struct SettingsToggleRow: View {
         }
         .padding(.horizontal, AppTheme.Spacing.lg)
         .padding(.vertical, AppTheme.Spacing.md)
+    }
+}
+
+// MARK: - Achievement Badge
+
+struct AchievementBadge: View {
+    let achievement: Achievement
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(achievement.isUnlocked ? achievement.color.opacity(0.15) : AppTheme.bgTertiary)
+                    .frame(width: 44, height: 44)
+                
+                if achievement.isUnlocked {
+                    Text(achievement.icon)
+                        .font(.system(size: 22))
+                } else {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(AppTheme.textTertiary.opacity(0.5))
+                }
+            }
+            
+            Text(achievement.title)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(achievement.isUnlocked ? AppTheme.textSecondary : AppTheme.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
     }
 }
 

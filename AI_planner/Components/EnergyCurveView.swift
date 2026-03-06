@@ -279,7 +279,9 @@ struct EnergyCurveFillShape: Shape {
         },
         peakHour: 10,
         valleyHour: 14,
-        hasSufficientData: true
+        hasSufficientData: true,
+        efficientSlots: [10, 11, 16],
+        procrastinationSlots: [14, 15]
     )
     
     ScrollView {
@@ -291,7 +293,9 @@ struct EnergyCurveFillShape: Shape {
                 dataPoints: (0..<24).map { EnergyDataPoint(hour: $0, value: 0) },
                 peakHour: 12,
                 valleyHour: 6,
-                hasSufficientData: false
+                hasSufficientData: false,
+                efficientSlots: [],
+                procrastinationSlots: []
             ))
         }
         .padding(.vertical, AppTheme.Spacing.lg)

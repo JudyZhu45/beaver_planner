@@ -22,6 +22,8 @@ struct AddEventSheet: View {
     @State private var selectedPriority: TodoTask.TaskPriority = .medium
     @State private var showTitleWarning = false
     @State private var showTimeWarning = false
+    @State private var recommendations: [TimeRecommendation] = []
+    @State private var showRecommendations = false
     
     private var isEditing: Bool { editingTask != nil }
     
@@ -172,6 +174,51 @@ struct AddEventSheet: View {
                             }
                         }
                         
+                        // Time Recommendations
+                        if showRecommendations && !recommendations.isEmpty && !isEditing {
+                            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                                HStack(spacing: AppTheme.Spacing.xs) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppTheme.secondaryTeal)
+                                    Text("Recommended Times")
+                                        .font(AppTheme.Typography.labelMedium)
+                                        .foregroundColor(AppTheme.textSecondary)
+                                }
+                                
+                                ForEach(recommendations) { rec in
+                                    Button {
+                                        startTime = rec.startDate(on: eventDate)
+                                        endTime = rec.endDate(on: eventDate)
+                                    } label: {
+                                        HStack(spacing: AppTheme.Spacing.md) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("\(rec.startTimeString) - \(rec.endTimeString)")
+                                                    .font(AppTheme.Typography.titleMedium)
+                                                    .foregroundColor(AppTheme.textPrimary)
+                                                Text(rec.reason)
+                                                    .font(AppTheme.Typography.labelSmall)
+                                                    .foregroundColor(AppTheme.textSecondary)
+                                                    .lineLimit(1)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            // Confidence indicator
+                                            CircularConfidenceView(confidence: rec.confidence)
+                                        }
+                                        .padding(AppTheme.Spacing.md)
+                                        .background(AppTheme.secondaryTeal.opacity(0.06))
+                                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.sm))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: AppTheme.Radius.sm)
+                                                .stroke(AppTheme.secondaryTeal.opacity(0.2), lineWidth: 1)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
                         // Date Field
                         VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
                             Text("Date")
@@ -272,6 +319,12 @@ struct AddEventSheet: View {
                         .onChange(of: startTime) {
                             if !isEndTimeBeforeStart { showTimeWarning = false }
                         }
+                        .onChange(of: selectedEventType) {
+                            loadRecommendations()
+                        }
+                        .onChange(of: eventDate) {
+                            loadRecommendations()
+                        }
                         
                         // Notes Field
                         VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
@@ -298,6 +351,22 @@ struct AddEventSheet: View {
                     .padding(AppTheme.Spacing.lg)
                 }
             }
+        }
+        .onAppear {
+            loadRecommendations()
+        }
+    }
+    
+    private func loadRecommendations() {
+        guard !isEditing else { return }
+        recommendations = TimeRecommendationEngine.shared.recommend(
+            eventType: selectedEventType,
+            durationMinutes: 60,
+            date: eventDate,
+            existingTasks: viewModel.todos
+        )
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showRecommendations = !recommendations.isEmpty
         }
     }
     
@@ -350,6 +419,33 @@ struct AddEventSheet: View {
         }
         
         isPresented = false
+    }
+}
+
+// MARK: - Confidence Indicator
+
+struct CircularConfidenceView: View {
+    let confidence: Double
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AppTheme.bgTertiary, lineWidth: 3)
+                .frame(width: 32, height: 32)
+            
+            Circle()
+                .trim(from: 0, to: confidence)
+                .stroke(
+                    confidence > 0.7 ? AppTheme.secondaryTeal : AppTheme.primaryDeepIndigo.opacity(0.6),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .frame(width: 32, height: 32)
+                .rotationEffect(.degrees(-90))
+            
+            Text("\(Int(confidence * 100))")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textSecondary)
+        }
     }
 }
 

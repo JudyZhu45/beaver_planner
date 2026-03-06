@@ -11,6 +11,7 @@ struct TodoChecklistItem: View {
     let task: TodoTask
     let onToggle: () -> Void
     let onDelete: () -> Void
+    var onEdit: (() -> Void)? = nil
     @State private var completionProgress: CGFloat = 0
     
     var body: some View {
@@ -32,6 +33,10 @@ struct TodoChecklistItem: View {
                         .foregroundColor(AppTheme.textSecondary)
                         .lineLimit(2)
                 }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onEdit?()
             }
             
             Spacer()
