@@ -19,6 +19,97 @@ class ChatViewModel: ObservableObject {
     
     let chatService = ChatService()
     
+    /// Structured task cards derived from pendingActions — shown as rich previews before confirmation
+    var pendingTaskCards: [PendingTaskCard] {
+        chatService.pendingActions.flatMap { action -> [PendingTaskCard] in
+            switch action {
+            case .createTask(let data):
+                return [makeCard(.create(data), data: data, actionBadge: "plus.circle.fill", actionLabel: "Add")]
+            case .createMultipleTasks(let list):
+                return list.map { makeCard(.create($0), data: $0, actionBadge: "plus.circle.fill", actionLabel: "Add") }
+            case .updateTask(_, let data):
+                return [makeCard(.update(data), data: data, actionBadge: "pencil.circle.fill", actionLabel: "Update")]
+            case .deleteTask(let id):
+                let title = chatService.todoViewModel?.todos.first(where: { $0.id.uuidString == id })?.title ?? "Task"
+                return [makeDeleteCard(kind: .delete(title: title), title: title, badge: "trash.circle.fill", label: "Delete")]
+            case .completeTask(let id):
+                let title = chatService.todoViewModel?.todos.first(where: { $0.id.uuidString == id })?.title ?? "Task"
+                return [makeDeleteCard(kind: .complete(title: title), title: title, badge: "checkmark.circle.fill", label: "Complete")]
+            }
+        }
+    }
+
+    // MARK: - Card builders
+
+    private func makeCard(_ kind: PendingTaskCard.CardKind, data: AITaskData, actionBadge: String, actionLabel: String) -> PendingTaskCard {
+        let color = resolveEventColor(data.eventType)
+        let timeLabel = resolveTimeLabel(start: data.startTime, end: data.endTime)
+        let durationLabel = resolveDuration(start: data.startTime, end: data.endTime)
+        let dateLabel = resolveDateLabel(data.dueDate)
+        return PendingTaskCard(
+            kind: kind,
+            title: data.title,
+            subtitle: data.description?.isEmpty == false ? data.description : nil,
+            dateLabel: dateLabel,
+            timeLabel: timeLabel,
+            durationLabel: durationLabel,
+            eventColor: color,
+            actionBadge: actionBadge,
+            actionLabel: actionLabel
+        )
+    }
+
+    private func makeDeleteCard(kind: PendingTaskCard.CardKind, title: String, badge: String, label: String) -> PendingTaskCard {
+        PendingTaskCard(
+            kind: kind,
+            title: title,
+            subtitle: nil,
+            dateLabel: nil,
+            timeLabel: nil,
+            durationLabel: nil,
+            eventColor: AppTheme.eventColors.last!,
+            actionBadge: badge,
+            actionLabel: label
+        )
+    }
+
+    private func resolveEventColor(_ eventTypeStr: String?) -> EventColor {
+        guard let raw = eventTypeStr?.lowercased() else { return AppTheme.eventColors.last! }
+        return AppTheme.eventColors.first(where: { $0.name.lowercased() == raw })
+            ?? AppTheme.eventColors.last!
+    }
+
+    private func resolveTimeLabel(start: String?, end: String?) -> String? {
+        guard let start else { return nil }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        let display = DateFormatter()
+        display.dateFormat = "h:mm a"
+        guard let s = fmt.date(from: start) else { return start }
+        let startStr = display.string(from: s)
+        if let end, let e = fmt.date(from: end) {
+            return "\(startStr) – \(display.string(from: e))"
+        }
+        return startStr
+    }
+
+    private func resolveDuration(start: String?, end: String?) -> String? {
+        guard let start, let end else { return nil }
+        let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
+        guard let s = fmt.date(from: start), let e = fmt.date(from: end) else { return nil }
+        let mins = Int(e.timeIntervalSince(s) / 60)
+        guard mins > 0 else { return nil }
+        return mins >= 60 ? "\(mins / 60)h\(mins % 60 > 0 ? " \(mins % 60)m" : "")" : "\(mins)m"
+    }
+
+    private func resolveDateLabel(_ dueDateStr: String?) -> String? {
+        guard let dueDateStr else { return nil }
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        guard let date = fmt.date(from: dueDateStr) else { return dueDateStr }
+        let display = DateFormatter(); display.dateFormat = "MMM d"
+        return display.string(from: date)
+    }
+    
     private let chatHistoryKey = "SavedChatHistory"
     private var streamingObserver: AnyCancellable?
     
@@ -90,8 +181,8 @@ class ChatViewModel: ObservableObject {
                     // Store action results for interactive display
                     lastActionResults = chatService.executedActions
                     
-                    // Detect if AI is awaiting confirmation (proposed but no actions executed)
-                    showConfirmButton = chatService.executedActions.isEmpty && looksLikeProposal(finalContent)
+                    // Show Confirm/Cancel buttons when AI has pending actions waiting for approval
+                    showConfirmButton = !chatService.pendingActions.isEmpty
                 }
             }
             
@@ -104,11 +195,27 @@ class ChatViewModel: ObservableObject {
     
     func confirmProposal() {
         showConfirmButton = false
-        sendMessage("确认")
+        // Directly execute cached pending actions — no extra API call needed
+        chatService.executePendingActions()
+        lastActionResults = chatService.executedActions
+    }
+    
+    func cancelProposal() {
+        showConfirmButton = false
+        chatService.cancelPendingActions()
     }
     
     private func looksLikeProposal(_ text: String) -> Bool {
-        let confirmKeywords = ["确认", "确定", "没问题就", "回复", "同意", "是否添加", "是否创建", "要我添加", "要我创建", "帮你添加", "帮你创建"]
+        let confirmKeywords = [
+            // Chinese
+            "确认", "确定", "没问题就", "回复", "同意", "是否添加", "是否创建",
+            "要我添加", "要我创建", "帮你添加", "帮你创建",
+            // English
+            "shall i add", "want me to add", "should i add",
+            "shall i create", "want me to create", "should i create",
+            "reply 'confirm'", "reply \"confirm\"", "looks good",
+            "if you'd like", "if you want", "ready to add", "ready to create"
+        ]
         let lower = text.lowercased()
         return confirmKeywords.contains { lower.contains($0) } ||
                lower.contains("confirm") ||

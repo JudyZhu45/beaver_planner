@@ -11,6 +11,7 @@ struct ContentView: View {
     var authManager: AuthManager
     @State private var selectedTab = 0
     @StateObject private var todoViewModel = TodoViewModel()
+    @StateObject private var chatViewModel = ChatViewModel()
 
     
     var body: some View {
@@ -29,6 +30,9 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { _, newValue in
             UserBehaviorStore.shared.recordTabSwitched(to: newValue)
+        }
+        .onAppear {
+            chatViewModel.configure(with: todoViewModel)
         }
     }
 
@@ -67,7 +71,7 @@ struct ContentView: View {
                 CalendarView(viewModel: todoViewModel)
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             case 2:
-                AIChatView(viewModel: todoViewModel)
+                AIChatView(viewModel: todoViewModel, chatViewModel: chatViewModel)
                     .transition(.opacity.combined(with: .scale(scale: 0.985)))
             default:
                 NavigationStack {

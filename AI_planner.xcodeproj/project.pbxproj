@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D981203D2F4E5DC7002C5CB1 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */; };
 		D981203F2F4F6C9C002C5CB1 /* Resume_AI_Planner.md in Resources */ = {isa = PBXBuildFile; fileRef = D981203E2F4F6C9C002C5CB1 /* Resume_AI_Planner.md */; };
 /* End PBXBuildFile section */
 
@@ -17,33 +16,9 @@
 		D99AFE342F470F8400881929 /* AI_planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AI_planner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		D9089F7A2F58A781001599A7 /* Exceptions for "AI_planner" folder in "AI_planner" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				docs/BeaverTheme.swift.reference,
-			);
-			target = D99AFE332F470F8400881929 /* AI_planner */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		D9089F7B2F58A781001599A7 /* Exceptions for "AI_planner" folder in "Compile Sources" phase from "AI_planner" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = D99AFE302F470F8400881929 /* Sources */;
-			membershipExceptions = (
-				docs/BeaverTheme.swift.reference,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D99AFE362F470F8400881929 /* AI_planner */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				D9089F7A2F58A781001599A7 /* Exceptions for "AI_planner" folder in "AI_planner" target */,
-				D9089F7B2F58A781001599A7 /* Exceptions for "AI_planner" folder in "Compile Sources" phase from "AI_planner" target */,
-			);
 			path = AI_planner;
 			sourceTree = "<group>";
 		};
@@ -388,12 +363,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D99AFE2C2F470F8400881929 /* Project object */;
 }

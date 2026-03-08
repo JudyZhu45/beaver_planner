@@ -25,7 +25,7 @@ private let quickPrompts: [QuickPrompt] = [
 
 struct AIChatView: View {
     @ObservedObject var viewModel: TodoViewModel
-    @StateObject private var chatViewModel = ChatViewModel()
+    @ObservedObject var chatViewModel: ChatViewModel
     @StateObject private var speechService = SpeechRecognitionService()
     @State private var inputText = ""
     @FocusState private var isInputFocused: Bool
@@ -120,7 +120,7 @@ struct AIChatView: View {
             }
         }
         .onAppear {
-            chatViewModel.configure(with: viewModel)
+            // chatViewModel is configured in ContentView; nothing to do here
         }
         .onChange(of: speechService.recognizedText) { _, newValue in
             if speechService.isRecording && !newValue.isEmpty {
@@ -376,7 +376,7 @@ struct AIChatView: View {
                                 chatViewModel.undoAction(result)
                             }
                         } label: {
-                            Text("撤销")
+                            Text("Undo")
                                 .font(AppTheme.Typography.labelSmall)
                                 .foregroundColor(AppTheme.accentCoral)
                                 .padding(.horizontal, AppTheme.Spacing.sm)
@@ -412,51 +412,79 @@ struct AIChatView: View {
     // MARK: - Confirm Button
     
     private var confirmButtonView: some View {
-        HStack(spacing: AppTheme.Spacing.md) {
-            Button {
-                withAnimation {
-                    chatViewModel.showConfirmButton = false
+        VStack(spacing: AppTheme.Spacing.md) {
+
+            // ── Header ────────────────────────────────────────────────
+            let cards = chatViewModel.pendingTaskCards
+            if !cards.isEmpty {
+                VStack(spacing: AppTheme.Spacing.sm) {
+                    // Section label
+                    HStack(spacing: AppTheme.Spacing.xs) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppTheme.accentGold)
+                        Text("Pending — not saved yet")
+                            .font(AppTheme.Typography.labelSmall)
+                            .foregroundColor(AppTheme.textTertiary)
+                        Spacer()
+                        Text("\(cards.count) task\(cards.count == 1 ? "" : "s")")
+                            .font(AppTheme.Typography.labelSmall)
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.lg)
+
+                    // Task cards
+                    ForEach(cards) { card in
+                        PendingTaskCardView(card: card)
+                            .padding(.horizontal, AppTheme.Spacing.lg)
+                    }
                 }
-            } label: {
-                Text("取消")
-                    .font(AppTheme.Typography.labelMedium)
-                    .foregroundColor(AppTheme.textSecondary)
+            }
+
+            // ── Cancel / Confirm buttons ───────────────────────────────
+            HStack(spacing: AppTheme.Spacing.md) {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        chatViewModel.cancelProposal()
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(AppTheme.Typography.labelMedium)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .padding(.horizontal, AppTheme.Spacing.xl)
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                        .background(AppTheme.bgElevated)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1))
+                }
+
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        chatViewModel.confirmProposal()
+                    }
+                } label: {
+                    HStack(spacing: AppTheme.Spacing.xs) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                        Text("Confirm")
+                            .font(AppTheme.Typography.labelMedium)
+                    }
+                    .foregroundColor(.white)
                     .padding(.horizontal, AppTheme.Spacing.xl)
                     .padding(.vertical, AppTheme.Spacing.sm)
-                    .background(AppTheme.bgElevated)
+                    .background(
+                        LinearGradient(
+                            colors: [AppTheme.primaryDeepIndigo, AppTheme.accentGold],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1)
-                    )
-            }
-            
-            Button {
-                withAnimation {
-                    chatViewModel.confirmProposal()
+                    .shadow(color: AppTheme.primaryDeepIndigo.opacity(0.22), radius: 8, x: 0, y: 4)
                 }
-            } label: {
-                HStack(spacing: AppTheme.Spacing.xs) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14))
-                    Text("确认添加")
-                        .font(AppTheme.Typography.labelMedium)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, AppTheme.Spacing.xl)
-                .padding(.vertical, AppTheme.Spacing.sm)
-                .background(
-                    LinearGradient(
-                        colors: [AppTheme.primaryDeepIndigo, AppTheme.accentGold],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(Capsule())
-                .shadow(color: AppTheme.primaryDeepIndigo.opacity(0.22), radius: 8, x: 0, y: 4)
             }
+            .padding(.horizontal, AppTheme.Spacing.lg)
         }
-        .padding(.horizontal, AppTheme.Spacing.lg)
     }
     
     // MARK: - Quick Prompts
@@ -523,5 +551,5 @@ struct AIChatView: View {
 }
 
 #Preview {
-    AIChatView(viewModel: .preview)
+    AIChatView(viewModel: .preview, chatViewModel: ChatViewModel())
 }
