@@ -4,6 +4,8 @@
 <dict>
 	<key>MOONSHOT_API_KEY</key>
 	<string>$(MOONSHOT_API_KEY)</string>
+	<key>OPENAI_API_KEY</key>
+	<string>$(OPENAI_API_KEY)</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>AI Planner needs access to your calendar to sync your events with the iOS Calendar app.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
