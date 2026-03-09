@@ -104,7 +104,7 @@ class ChatService: ObservableObject {
     /// Actions proposed by AI but not yet executed — waiting for user confirmation
     @Published private(set) var pendingActions: [AIAction] = []
     
-    private let api = KimiAPIService.shared
+    private let api = AIAPIService.shared
     private var conversationHistory: [KimiMessage] = []
     private let maxHistoryMessages = 20
     
@@ -195,7 +195,7 @@ class ChatService: ObservableObject {
     }
     
     // MARK: - Step 2: Build System Prompt with Window Tasks
-    
+
     private func buildSystemPrompt(userMessage: String, windowTasks: [TodoTask]) -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -211,115 +211,99 @@ class ChatService: ObservableObject {
         let weekday = weekdayFormatter.string(from: Date())
         
         let tasksContext = formatTasksForContext(windowTasks, dateFormatter: dateFormatter, timeFormatter: timeFormatter)
-        let userProfileSummary = BehaviorAnalyzer.shared.generateProfileSummary(days: 30)
         let beaverPersona = BeaverPersonality.shared.personaPrompt(tasks: todoViewModel?.todos ?? [])
         let chatMemory = ChatMemoryStore.shared.generateMemorySummary()
-        
+
         return """
-        \(beaverPersona)
-        
-        You are also an intelligent schedule planning assistant integrated into a task management app. You can have natural conversations and directly manage the user's tasks.
+        You are Beaver, a warm and playful schedule assistant in a task management app.
 
-        Current date: \(today) (\(weekday))
-        Current time: \(currentTime)
+        You can:
+        1. Chat naturally with the user
+        2. Create, update, delete, complete tasks
+        3. Plan daily or weekly schedules
 
-        ## User Behavior Profile
-        \(userProfileSummary)
-        \(chatMemory.isEmpty ? "" : "\n        \(chatMemory)")
+        Current date: \(today) (\(weekday))  
+        Current time: \(currentTime)  
+        \(chatMemory.isEmpty ? "" : chatMemory)
 
-        ## Your Capabilities
-        1. Natural conversation: Answer questions, give advice
-        2. Create tasks: When the user asks to schedule something
-        3. Update tasks: Modify details of existing tasks
-        4. Delete tasks: Remove unwanted tasks
-        5. Complete tasks: Mark tasks as completed
-        6. Plan schedules: Create multiple tasks at once (daily/weekly plans)
-
-        ## Existing Tasks in the Relevant Time Window
+        ## Existing Tasks (Editable)
+        The following tasks exist and may need to be kept, moved, updated, or deleted depending on user request or AI adjustment:
         \(tasksContext)
 
-        ## Important Workflow (Must Follow Strictly)
+        ## Core Rules
 
-        ### Execution Mode Decision
-        Determine the execution mode based on user input:
+        1. Always check existing tasks before creating new tasks.
+        2. Respect user peak hours, preferred durations, and task habits.
+        3. Leave reasonable gaps; avoid overloading the schedule.
+        4. 24-hour format HH:mm, date YYYY-MM-DD. event_type: gym, class, study, meeting, dinner, other. priority: low, medium, high.
 
-        **Mode 1: Direct Execution (skip confirmation)**
-        Output [ACTION] directly when ALL of these conditions are met:
-        - User provides COMPLETE task information including an EXPLICIT time (e.g., "Schedule a meeting tomorrow from 3pm to 4pm")
-        - The operation affects exactly ONE task
-        - User asks to complete or delete exactly ONE specific task (referenced by clear title or ID)
-        - User modifies their own existing single task with explicit new time (e.g., "Move tomorrow's 3pm meeting to 4pm")
+        ## Conflict Detection (CRITICAL)
 
-        **Mode 2: Propose then Confirm**
-        When ANY of these situations apply, show the plan and include [ACTION] blocks but mark them as pending:
-        - User request is vague (e.g., "Help me plan tomorrow")
-        - User asks AI to decide the time (e.g., "时间你定", "you decide when", "安排一下", "帮我安排", "找个时间") — ALWAYS Mode 2
-        - User gives a task but no specific time — AI must choose a time slot → ALWAYS Mode 2
-        - Any bulk operation: deleting or completing 2 or more tasks at once (e.g., "delete all tasks today", "complete all gym tasks", "remove everything this week")
-        - ANY delete or complete operation that matches multiple tasks by date, category, or keyword
-        - Operations that might overwrite or delete important data
-        - AI needs to proactively schedule/recommend times (e.g., "Schedule some study time for me")
-        - The requested time slot conflicts with existing tasks listed above
-        - When in doubt about scope (could affect more than one task), always use Mode 2
+        - Any time overlap is a conflict.
+        - If a conflict exists, propose conflict-free alternatives.
+        - Include necessary update/delete actions in ACTION blocks.
 
-        ### Two-Step Confirmation Flow (for Mode 2)
+        ## Proposal & ACTION Rules
 
-        **Step 1: Propose a plan**
-        Describe your proposal in natural language with a clear list format.
-        Include the [ACTION] blocks as usual, then end your reply with the single tag: [PENDING]
-        The app will show Confirm / Cancel buttons to the user — do NOT ask the user to reply with any text.
-        The [ACTION] blocks will be hidden from the user; only the natural language description is shown.
+        - Every proposed plan (including replan or AI adjustment) must include all required ACTION blocks implementing the final schedule.
+        - ACTION blocks must include:
+            - update_task for modified existing tasks
+            - delete_task for removed tasks
+            - create_task for new tasks
+        - Always generate ACTION during proposal; do not wait for user confirmation.
+        - User confirmation will be handled by frontend.
+        - **If a user requests to move/reschedule a task, always use update_task with task_id.**
+        - **If conflicts exist, include update/delete of conflicting tasks in the same proposal.**
+        - Avoid duplicates; always check existing tasks before creating new ones.
 
-        **Step 2: User taps Confirm or Cancel**
-        The app handles this automatically. You do NOT need to output anything else.
-        If the user types a follow-up message instead of tapping a button, treat it as a new request.
+        ## Replan / AI Adjustment
 
-        ## ACTION Format (follow strictly, do not modify the format)
+        - When replanning or AI proposes changes, treat it as **schedule modification**:
+        1. Analyze existing tasks
+        2. Decide which tasks to keep, move (update), or remove (delete)
+        3. Create new tasks only if they don't exist
+        - Avoid duplicate tasks; prefer update_task over create_task for similar tasks.
 
-        Create a single task:
+        ## Confirmation Flow
+
+        1. Propose plan with natural language explanation
+        2. Include all ACTION blocks representing final schedule
+        3. End proposal with [PENDING] for frontend confirmation
+        4. Upon confirmation, frontend executes ACTION blocks
+
+        ## ACTION Format (single line JSON)
+
+        Create one task:
         [ACTION]
         {"action":"create_task","task":{"title":"Meeting","description":"Team standup","due_date":"2026-02-25","start_time":"15:00","end_time":"16:00","priority":"high","event_type":"meeting"}}
         [/ACTION]
 
-        Create multiple tasks (for daily/weekly plans):
+        Update task:
         [ACTION]
-        {"action":"create_multiple","tasks":[{"title":"Gym","due_date":"2026-02-25","start_time":"08:00","end_time":"09:00","priority":"medium","event_type":"gym"},{"title":"Study","due_date":"2026-02-25","start_time":"10:00","end_time":"12:00","priority":"high","event_type":"study"}]}
+        {"action":"update_task","task_id":"UUID","task":{"start_time":"14:00","end_time":"15:00"}}
         [/ACTION]
 
-        Update a task:
-        [ACTION]
-        {"action":"update_task","task_id":"UUID","task":{"title":"New title","start_time":"14:00"}}
-        [/ACTION]
-
-        Delete a task:
+        Delete task:
         [ACTION]
         {"action":"delete_task","task_id":"UUID"}
         [/ACTION]
 
-        Complete a task:
+        Complete task:
         [ACTION]
         {"action":"complete_task","task_id":"UUID"}
         [/ACTION]
 
-        ## Rules
-        - Always reply in the same language the user uses
-        - JSON inside [ACTION] blocks must be on a single line, no line breaks
-        - [INTENT] tags go at the very end of the reply, on their own line
-        - Do not show JSON code in the conversation text; [ACTION] blocks are automatically hidden by the system
-        - When creating timed events, both start_time and end_time are required
-        - Use 24-hour format (HH:mm) and ISO date format (YYYY-MM-DD)
-        - event_type options: gym, class, study, meeting, dinner, other
-        - priority options: low, medium, high
-        - "tomorrow" = the day after today \(today)
-        - "next week" = starting from next Monday
-        - When planning schedules, leave reasonable breaks/commute time between tasks
-        - Check the existing tasks listed above to avoid creating time conflicts
-        - If the requested time conflicts with existing tasks, explain the conflict, suggest alternatives, and wait for user decision. Do NOT output [ACTION] in this case.
-        - **Conflict resolution (CRITICAL)**: When the user confirms a conflict resolution (e.g., "push dinner back", "move the other task"), you MUST output ALL required [ACTION] blocks in the same reply — both the new task AND the update to the conflicting task. Never output only half the changes. Every task mentioned in your natural language plan must have a corresponding [ACTION] block.
-        - If the user's request is unclear, ask for details before planning
-        - Reference the user profile's peak hours and habits; prioritize important tasks during peak hours
-        - Strictly follow constraints and preferences from user preference memory (e.g., if "doesn't like waking up early", don't schedule morning tasks)
-        - When the user expresses new preferences or habits, naturally acknowledge and remember them
+        Create multiple tasks:
+        [ACTION]
+        {"action":"create_multiple","tasks":[{"title":"Gym","due_date":"2026-02-25","start_time":"08:00","end_time":"09:00","priority":"medium","event_type":"gym"}]}
+        [/ACTION]
+
+        ## Special Notes
+
+        - Be concise, organized, and occasionally playful 🦫
+        - Avoid creating duplicates
+        - Always follow conflict detection and replan rules
+        - Proposal must include final ACTION blocks; frontend handles confirmation
         """
     }
     
@@ -337,8 +321,23 @@ class ChatService: ObservableObject {
         lines.append("The following tasks already exist in the user's schedule for the relevant time period:")
         
         for date in grouped.keys.sorted() {
+            let dayTasks = grouped[date, default: []].sorted {
+                ($0.startTime ?? $0.dueDate) < ($1.startTime ?? $1.dueDate)
+            }
             lines.append("### \(dateFormatter.string(from: date))")
-            for task in grouped[date, default: []] {
+            
+            // Occupied time slots summary — helps AI avoid conflicts at a glance
+            let timedTasks = dayTasks.filter { $0.startTime != nil && $0.endTime != nil }
+            if !timedTasks.isEmpty {
+                let slots = timedTasks.map { task -> String in
+                    let s = timeFormatter.string(from: task.startTime!)
+                    let e = timeFormatter.string(from: task.endTime!)
+                    return "\(s)–\(e) [\(task.title)]"
+                }.joined(separator: ", ")
+                lines.append("⚠️ OCCUPIED SLOTS (do NOT schedule anything overlapping these): \(slots)")
+            }
+            
+            for task in dayTasks {
                 lines.append(formatTask(task, dateFormatter: dateFormatter, timeFormatter: timeFormatter))
             }
         }
@@ -369,16 +368,28 @@ class ChatService: ObservableObject {
     
     // MARK: - Fetch Tasks in Window
     
+    /// Parse a date string that may be "yyyy-MM-dd" or "yyyy-MM-dd'T'HH:mm:ss" (or similar ISO variants).
+    /// Always extracts just the date portion in the current calendar timezone.
+    private func parseDateOnly(from str: String) -> Date? {
+        // Try plain date first
+        let plain = DateFormatter()
+        plain.dateFormat = "yyyy-MM-dd"
+        plain.timeZone = TimeZone.current
+        if let d = plain.date(from: str) { return d }
+        
+        // AI sometimes returns ISO-8601 with time component — strip it
+        let dateOnly = String(str.prefix(10)) // "2026-03-09T15:00:00" → "2026-03-09"
+        return plain.date(from: dateOnly)
+    }
+    
     private func fetchTasksInWindow(startDate: String?, endDate: String?) -> [TodoTask] {
         guard let vm = todoViewModel else { return [] }
         
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
         let calendar = Calendar.current
         
         // If no date range, return today + tomorrow as default context
         guard let startStr = startDate,
-              let start = dateFormatter.date(from: startStr) else {
+              let start = parseDateOnly(from: startStr) else {
             let today = calendar.startOfDay(for: Date())
             let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
             return vm.todos.filter {
@@ -388,7 +399,7 @@ class ChatService: ObservableObject {
         }
         
         let end: Date
-        if let endStr = endDate, let e = dateFormatter.date(from: endStr) {
+        if let endStr = endDate, let e = parseDateOnly(from: endStr) {
             end = e
         } else {
             end = start
@@ -423,6 +434,9 @@ class ChatService: ObservableObject {
         let timeWindow = await extractTimeWindow(from: userMessage)
         lastTimeWindow = timeWindow
         
+        print("🔍 [Step1] timeWindow: start=\(timeWindow.startDate ?? "nil"), end=\(timeWindow.endDate ?? "nil"), isScheduling=\(timeWindow.isSchedulingRelated)")
+        print("🔍 [Step1] todoViewModel has \(todoViewModel?.todos.count ?? -1) total tasks")
+        
         // === Fetch existing tasks in that window ===
         let windowTasks: [TodoTask]
         if timeWindow.isSchedulingRelated {
@@ -431,8 +445,22 @@ class ChatService: ObservableObject {
             windowTasks = fetchTasksInWindow(startDate: nil, endDate: nil)
         }
         
+        print("🔍 [Step1] windowTasks count: \(windowTasks.count)")
+        let tf = DateFormatter(); tf.dateFormat = "HH:mm"; tf.timeZone = TimeZone.current
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = TimeZone.current
+        for t in windowTasks {
+            let startLocal = t.startTime.map { tf.string(from: $0) } ?? "nil"
+            let endLocal = t.endTime.map { tf.string(from: $0) } ?? "nil"
+            let dueLocal = df.string(from: t.dueDate)
+            print("🔍   task: \(t.title) | dueLocal: \(dueLocal) | startLocal: \(startLocal) | endLocal: \(endLocal) | dueUTC: \(t.dueDate) | startUTC: \(t.startTime?.description ?? "nil")")
+        }
+        print("🔍 [Step1] System timezone: \(TimeZone.current.identifier)")
+        
         // === Step 2: Send to AI with task context (streaming) ===
         let systemPrompt = buildSystemPrompt(userMessage: userMessage, windowTasks: windowTasks)
+        
+        // Log the full system prompt sent to AI
+        print("📋 [Step2] Full system prompt sent to AI:\n\(systemPrompt)\n📋 [Step2] END of system prompt")
         
         if conversationHistory.isEmpty {
             conversationHistory.append(KimiMessage(role: "system", content: systemPrompt))
@@ -460,16 +488,9 @@ class ChatService: ObservableObject {
             let actions = parseActions(from: fullResponse)
             let isPending = fullResponse.contains("[PENDING]")
             
-            if !actions.isEmpty && isPending {
-                // Mode 2: AI proposed a plan — hold actions until user taps Confirm
+            if !actions.isEmpty {
+                // Always hold actions as pending — user must tap Confirm
                 pendingActions = actions
-            } else if !actions.isEmpty {
-                // Mode 1: Direct execution
-                pendingActions = []
-                let validatedActions = validateAndFilterActions(actions)
-                for action in validatedActions {
-                    executeAction(action)
-                }
             } else {
                 pendingActions = []
             }
@@ -569,7 +590,7 @@ class ChatService: ObservableObject {
             case "update_task":
                 if let taskId = json["task_id"] as? String,
                    let taskDict = json["task"] as? [String: Any],
-                   let taskData = parseTaskData(from: taskDict) {
+                   let taskData = parseTaskDataForUpdate(from: taskDict) {
                     actions.append(.updateTask(id: taskId, fields: taskData))
                 }
                 
@@ -593,6 +614,21 @@ class ChatService: ObservableObject {
     
     private func parseTaskData(from dict: [String: Any]) -> AITaskData? {
         guard let title = dict["title"] as? String else { return nil }
+        return AITaskData(
+            title: title,
+            description: dict["description"] as? String,
+            dueDate: dict["due_date"] as? String,
+            startTime: dict["start_time"] as? String,
+            endTime: dict["end_time"] as? String,
+            priority: dict["priority"] as? String,
+            eventType: dict["event_type"] as? String
+        )
+    }
+
+    /// Lenient parser for update_task — title is optional since we may only update specific fields.
+    private func parseTaskDataForUpdate(from dict: [String: Any]) -> AITaskData? {
+        // update_task may omit title; use empty string as sentinel — applyUpdates only overwrites non-nil fields
+        let title = dict["title"] as? String ?? ""
         return AITaskData(
             title: title,
             description: dict["description"] as? String,
@@ -681,8 +717,18 @@ class ChatService: ObservableObject {
             if UUID(uuidString: id) == nil {
                 return .invalid(reason: "Invalid task ID: \(id)")
             }
-            if case .invalid(let reason) = validateTaskData(data) {
-                return .invalid(reason: reason)
+            // For update_task, title may be omitted (only changed fields are provided)
+            // so we skip the empty-title check and only validate time range if present
+            if let startStr = data.startTime, let endStr = data.endTime {
+                let startParts = startStr.split(separator: ":").compactMap { Int($0) }
+                let endParts = endStr.split(separator: ":").compactMap { Int($0) }
+                if startParts.count >= 2 && endParts.count >= 2 {
+                    let startMinutes = startParts[0] * 60 + startParts[1]
+                    let endMinutes = endParts[0] * 60 + endParts[1]
+                    if startMinutes >= endMinutes {
+                        return .invalid(reason: "End time must be later than start time")
+                    }
+                }
             }
             return .valid
         case .deleteTask(let id):
@@ -873,7 +919,8 @@ class ChatService: ObservableObject {
     }
     
     private func applyUpdates(_ data: AITaskData, to task: inout TodoTask) {
-        task.title = data.title
+        // Only overwrite title when AI explicitly provided one (update_task may omit it)
+        if !data.title.isEmpty { task.title = data.title }
         if let desc = data.description { task.description = desc }
         
         let calendar = Calendar.current
@@ -937,5 +984,41 @@ class ChatService: ObservableObject {
         
         let trimmed = Array(chatMessages.suffix(maxHistoryMessages))
         return [systemMessage] + trimmed
+    }
+    
+    // MARK: - Debug: Test Step 1 + Fetch (temporary)
+    
+    func debugExtractAndFetch(userMessage: String) async -> AIDebugView.DebugResult {
+        let timeWindow = await extractTimeWindow(from: userMessage)
+        
+        let windowTasks: [TodoTask]
+        if timeWindow.isSchedulingRelated {
+            windowTasks = fetchTasksInWindow(startDate: timeWindow.startDate, endDate: timeWindow.endDate)
+        } else {
+            windowTasks = fetchTasksInWindow(startDate: nil, endDate: nil)
+        }
+        
+        let tf = DateFormatter(); tf.dateFormat = "HH:mm"; tf.timeZone = .current
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current
+        
+        let taskTuples = windowTasks.map { t in
+            (
+                title: t.title,
+                dueDate: df.string(from: t.dueDate),
+                startTime: t.startTime.map { tf.string(from: $0) } ?? "nil",
+                endTime: t.endTime.map { tf.string(from: $0) } ?? "nil",
+                id: t.id.uuidString
+            )
+        }
+        
+        let contextString = formatTasksForContext(windowTasks, dateFormatter: df, timeFormatter: tf)
+        
+        return AIDebugView.DebugResult(
+            startDate: timeWindow.startDate,
+            endDate: timeWindow.endDate,
+            isSchedulingRelated: timeWindow.isSchedulingRelated,
+            tasks: taskTuples,
+            taskContextForAI: contextString
+        )
     }
 }

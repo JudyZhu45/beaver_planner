@@ -73,11 +73,14 @@ struct ContentView: View {
             case 2:
                 AIChatView(viewModel: todoViewModel, chatViewModel: chatViewModel)
                     .transition(.opacity.combined(with: .scale(scale: 0.985)))
-            default:
+            case 3:
                 NavigationStack {
                     ProfileView(authManager: authManager, viewModel: todoViewModel)
                 }
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
+            default:
+                AIDebugView(todoViewModel: todoViewModel, chatViewModel: chatViewModel)
+                    .transition(.opacity)
             }
         }
     }

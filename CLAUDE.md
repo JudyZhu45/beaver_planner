@@ -42,7 +42,7 @@ TodoTask {
 |------|---------|
 | `AuthManager.swift` | @Observable, AWS Cognito auth (sign in/up/out, email verify) |
 | `ChatService.swift` | AI chat orchestration: system prompt build, SSE streaming, [ACTION] parsing, undo support |
-| `KimiAPIService.swift` | Low-level Kimi/Moonshot API calls with SSE |
+| `AIAPIService.swift` | Low-level AI API calls (GPT-4o / Kimi) with SSE |
 | `ChatMemoryStore.swift` | Persistent user preference storage (structured + chat-extracted), injected into AI system prompt |
 | `BehaviorAnalyzer.swift` | Analyzes task completion patterns, productive hours, trends |
 | `UserBehaviorStore.swift` | Raw behavior event logging (app opens, tab switches, task actions) |

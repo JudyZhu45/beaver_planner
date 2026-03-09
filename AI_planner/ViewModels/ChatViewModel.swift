@@ -27,8 +27,13 @@ class ChatViewModel: ObservableObject {
                 return [makeCard(.create(data), data: data, actionBadge: "plus.circle.fill", actionLabel: "Add")]
             case .createMultipleTasks(let list):
                 return list.map { makeCard(.create($0), data: $0, actionBadge: "plus.circle.fill", actionLabel: "Add") }
-            case .updateTask(_, let data):
-                return [makeCard(.update(data), data: data, actionBadge: "pencil.circle.fill", actionLabel: "Update")]
+            case .updateTask(let id, let data):
+                // If AI omitted the title (partial update), fall back to the existing task's title
+                var displayData = data
+                if displayData.title.isEmpty {
+                    displayData.title = chatService.todoViewModel?.todos.first(where: { $0.id.uuidString == id })?.title ?? "Task"
+                }
+                return [makeCard(.update(displayData), data: displayData, actionBadge: "pencil.circle.fill", actionLabel: "Update")]
             case .deleteTask(let id):
                 let title = chatService.todoViewModel?.todos.first(where: { $0.id.uuidString == id })?.title ?? "Task"
                 return [makeDeleteCard(kind: .delete(title: title), title: title, badge: "trash.circle.fill", label: "Delete")]
@@ -203,24 +208,6 @@ class ChatViewModel: ObservableObject {
     func cancelProposal() {
         showConfirmButton = false
         chatService.cancelPendingActions()
-    }
-    
-    private func looksLikeProposal(_ text: String) -> Bool {
-        let confirmKeywords = [
-            // Chinese
-            "确认", "确定", "没问题就", "回复", "同意", "是否添加", "是否创建",
-            "要我添加", "要我创建", "帮你添加", "帮你创建",
-            // English
-            "shall i add", "want me to add", "should i add",
-            "shall i create", "want me to create", "should i create",
-            "reply 'confirm'", "reply \"confirm\"", "looks good",
-            "if you'd like", "if you want", "ready to add", "ready to create"
-        ]
-        let lower = text.lowercased()
-        return confirmKeywords.contains { lower.contains($0) } ||
-               lower.contains("confirm") ||
-               lower.contains("shall i") ||
-               lower.contains("want me to")
     }
     
     // MARK: - Undo Action

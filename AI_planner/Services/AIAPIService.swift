@@ -1,11 +1,45 @@
 //
-//  KimiAPIService.swift
+//  AIAPIService.swift
 //  AI_planner
 //
 //  Created by Judy459 on 2/24/26.
 //
 
 import Foundation
+
+// MARK: - Model Provider Selection
+
+enum AIModelProvider: String, CaseIterable, Identifiable {
+    case kimi = "Kimi"
+    case gpt4 = "GPT-4o"
+    
+    var id: String { rawValue }
+    
+    var endpoint: String {
+        switch self {
+        case .kimi:  return "https://api.moonshot.cn/v1/chat/completions"
+        case .gpt4:  return "https://api.openai.com/v1/chat/completions"
+        }
+    }
+    
+    var modelName: String {
+        switch self {
+        case .kimi:  return "moonshot-v1-32k"
+        case .gpt4:  return "gpt-4o"
+        }
+    }
+    
+    var apiKey: String? {
+        switch self {
+        case .kimi:
+            return Bundle.main.infoDictionary?["MOONSHOT_API_KEY"] as? String
+        case .gpt4:
+            return Bundle.main.infoDictionary?["OPENAI_API_KEY"] as? String
+        }
+    }
+    
+    var displayName: String { rawValue }
+}
 
 // MARK: - API Request/Response Models
 
@@ -53,7 +87,7 @@ enum KimiAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "API Key not configured. Please set MOONSHOT_API_KEY in Secrets.xcconfig."
+            return "API Key not configured. Please check Secrets.xcconfig."
         case .invalidURL:
             return "Invalid API URL."
         case .httpError(let code, let body):
@@ -70,14 +104,21 @@ enum KimiAPIError: LocalizedError {
 
 // MARK: - Service
 
-class KimiAPIService {
-    static let shared = KimiAPIService()
-    
-    private let endpoint = "https://api.moonshot.cn/v1/chat/completions"
-    private let model = "moonshot-v1-32k"
-    
-    private var apiKey: String? {
-        Bundle.main.infoDictionary?["MOONSHOT_API_KEY"] as? String
+class AIAPIService {
+    static let shared = AIAPIService()
+
+    /// Backward-compatibility alias so existing code referencing KimiAPIService.shared still compiles
+    static var KimiAPIService: AIAPIService { shared }
+
+    /// Current model provider — defaults to GPT-4o
+    var activeProvider: AIModelProvider {
+        get {
+            let raw = UserDefaults.standard.string(forKey: "selectedAIModel") ?? AIModelProvider.gpt4.rawValue
+            return AIModelProvider(rawValue: raw) ?? .gpt4
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "selectedAIModel")
+        }
     }
     
     private init() {}
@@ -85,10 +126,11 @@ class KimiAPIService {
     // MARK: - Streaming Request
     
     func streamChat(messages: [KimiMessage], temperature: Double = 0.3) async throws -> AsyncThrowingStream<String, Error> {
-        guard let key = apiKey, !key.isEmpty, !key.contains("your-api-key") else {
+        let provider = activeProvider
+        guard let key = provider.apiKey, !key.isEmpty, !key.contains("your-api-key"), !key.contains("YOUR_API_KEY") else {
             throw KimiAPIError.missingAPIKey
         }
-        guard let url = URL(string: endpoint) else {
+        guard let url = URL(string: provider.endpoint) else {
             throw KimiAPIError.invalidURL
         }
         
@@ -99,7 +141,7 @@ class KimiAPIService {
         request.timeoutInterval = 120
         
         let body = KimiChatRequest(
-            model: model,
+            model: provider.modelName,
             messages: messages,
             temperature: temperature,
             stream: true
@@ -112,7 +154,6 @@ class KimiAPIService {
             throw KimiAPIError.networkError(URLError(.badServerResponse))
         }
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Try to read some error info from the stream
             var errorBody = ""
             for try await line in bytes.lines {
                 errorBody += line
@@ -141,7 +182,6 @@ class KimiAPIService {
                                 continuation.yield(content)
                             }
                         } catch {
-                            // Skip malformed chunks, continue streaming
                             continue
                         }
                     }
@@ -153,13 +193,14 @@ class KimiAPIService {
         }
     }
     
-    // MARK: - Non-streaming Request (fallback)
+    // MARK: - Non-streaming Request
     
     func sendChat(messages: [KimiMessage], temperature: Double = 0.3) async throws -> String {
-        guard let key = apiKey, !key.isEmpty, !key.contains("your-api-key") else {
+        let provider = activeProvider
+        guard let key = provider.apiKey, !key.isEmpty, !key.contains("your-api-key"), !key.contains("YOUR_API_KEY") else {
             throw KimiAPIError.missingAPIKey
         }
-        guard let url = URL(string: endpoint) else {
+        guard let url = URL(string: provider.endpoint) else {
             throw KimiAPIError.invalidURL
         }
         
@@ -170,7 +211,7 @@ class KimiAPIService {
         request.timeoutInterval = 60
         
         let body = KimiChatRequest(
-            model: model,
+            model: provider.modelName,
             messages: messages,
             temperature: temperature,
             stream: false
@@ -195,3 +236,7 @@ class KimiAPIService {
         }
     }
 }
+
+/// Backward-compatibility typealias — keeps existing code referencing `KimiAPIService` compiling
+/// without requiring a mass rename throughout the project.
+typealias KimiAPIService = AIAPIService
