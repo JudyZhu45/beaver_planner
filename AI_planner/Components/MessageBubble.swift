@@ -488,40 +488,40 @@ struct MarkdownTextView: View {
     ScrollView {
         VStack(spacing: AppTheme.Spacing.lg) {
             MessageBubble(message: Message(
-                content: "帮我安排一下明天的学习计划",
+                content: "Help me plan tomorrow's study schedule",
                 sender: .user,
                 timestamp: Date()
             ))
             
             MessageBubble(message: Message(
                 content: """
-                ### 明天的学习计划
+                ### Tomorrow's Study Plan
 
-                根据你的目标，我建议这样安排：
+                Based on your goals, here's my suggestion:
 
-                **上午（高效时段）**
-                1. 数学复习 — 9:00~10:30
-                2. 英语阅读 — 10:45~12:00
+                **Morning (Peak Focus)**
+                1. Math Review — 9:00~10:30
+                2. English Reading — 10:45~12:00
 
-                **下午**
-                - 完成 *物理* 作业
-                - 整理笔记并回顾错题
+                **Afternoon**
+                - Complete *Physics* homework
+                - Organize notes and review mistakes
 
-                > 记得每隔 45 分钟休息 5~10 分钟！
+                > Remember to take a 5–10 minute break every 45 minutes!
 
                 ```
-                总计学习时长: 约 5 小时
-                休息时间: 约 1 小时
+                Total study time: ~5 hours
+                Break time: ~1 hour
                 ```
 
-                需要我帮你创建这些任务吗？
+                Would you like me to create these tasks for you?
                 """,
                 sender: .ai,
                 timestamp: Date()
             ))
             
             MessageBubble(message: Message(
-                content: "好的，帮我创建吧",
+                content: "Yes, please create them",
                 sender: .user,
                 timestamp: Date()
             ))

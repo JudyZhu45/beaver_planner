@@ -153,11 +153,11 @@ class ChatService: ObservableObject {
         Rules:
         1. Output ONLY a JSON object, nothing else.
         2. Extract the date range the user is referring to.
-        3. If the user mentions a single day (e.g., "tomorrow", "明天", "3月10日"), startDate and endDate should be the same day.
+        3. If the user mentions a single day (e.g., "tomorrow", "March 10"), startDate and endDate should be the same day.
         4. If no date/time context at all (pure chat like "hello", "thank you"), set isSchedulingRelated to false and dates to null.
         5. If the user mentions a time but no date, default to today.
-        6. For ANY scheduling request (plan, arrange, schedule, 安排, 规划), set isSchedulingRelated to true.
-        7. If the user says "you decide the time" / "时间你定" / "你来安排时间", still extract the date from context and set isSchedulingRelated to true.
+        6. For ANY scheduling request (plan, arrange, schedule), set isSchedulingRelated to true.
+        7. If the user says "you decide the time" / "you pick the time", still extract the date from context and set isSchedulingRelated to true.
         8. IMPORTANT: Even if no exact time is given, if the user wants a task created or scheduled on a specific day, set isSchedulingRelated to true and extract that day.
         
         JSON shape:
@@ -985,40 +985,5 @@ class ChatService: ObservableObject {
         let trimmed = Array(chatMessages.suffix(maxHistoryMessages))
         return [systemMessage] + trimmed
     }
-    
-    // MARK: - Debug: Test Step 1 + Fetch (temporary)
-    
-    func debugExtractAndFetch(userMessage: String) async -> AIDebugView.DebugResult {
-        let timeWindow = await extractTimeWindow(from: userMessage)
-        
-        let windowTasks: [TodoTask]
-        if timeWindow.isSchedulingRelated {
-            windowTasks = fetchTasksInWindow(startDate: timeWindow.startDate, endDate: timeWindow.endDate)
-        } else {
-            windowTasks = fetchTasksInWindow(startDate: nil, endDate: nil)
-        }
-        
-        let tf = DateFormatter(); tf.dateFormat = "HH:mm"; tf.timeZone = .current
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current
-        
-        let taskTuples = windowTasks.map { t in
-            (
-                title: t.title,
-                dueDate: df.string(from: t.dueDate),
-                startTime: t.startTime.map { tf.string(from: $0) } ?? "nil",
-                endTime: t.endTime.map { tf.string(from: $0) } ?? "nil",
-                id: t.id.uuidString
-            )
-        }
-        
-        let contextString = formatTasksForContext(windowTasks, dateFormatter: df, timeFormatter: tf)
-        
-        return AIDebugView.DebugResult(
-            startDate: timeWindow.startDate,
-            endDate: timeWindow.endDate,
-            isSchedulingRelated: timeWindow.isSchedulingRelated,
-            tasks: taskTuples,
-            taskContextForAI: contextString
-        )
-    }
+
 }

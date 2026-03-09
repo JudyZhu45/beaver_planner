@@ -13,7 +13,7 @@ import Foundation
 struct UserPreference: Codable, Identifiable {
     let id: UUID
     let category: PreferenceCategory
-    let content: String          // The preference itself (Chinese)
+    let content: String          // The preference itself
     let source: String           // What user said that led to this
     let createdAt: Date
     var confirmedCount: Int      // How many times this preference was reinforced
@@ -188,12 +188,12 @@ class ChatMemoryStore {
         
         // Schedule preferences
         let schedulePatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("不喜欢早起", { _ in "User doesn't like waking up early — avoid scheduling tasks before 8 AM" }),
-            ("不要.*早上", { _ in "User doesn't want tasks scheduled in the morning" }),
-            ("喜欢.*早起", { _ in "User likes waking up early — morning tasks are OK" }),
-            ("晚上.*不要", { _ in "User doesn't want tasks scheduled in the evening" }),
-            ("午休", { _ in "User takes a lunch break — don't schedule tasks 12–2 PM" }),
-            ("午睡", { _ in "User takes afternoon naps — don't schedule midday tasks" }),
+            ("don'?t.*like.*early", { _ in "User doesn't like waking up early — avoid scheduling tasks before 8 AM" }),
+            ("no.*morning", { _ in "User doesn't want tasks scheduled in the morning" }),
+            ("(like|prefer).*early", { _ in "User likes waking up early — morning tasks are OK" }),
+            ("no.*(evening|night)", { _ in "User doesn't want tasks scheduled in the evening" }),
+            ("lunch.*break", { _ in "User takes a lunch break — don't schedule tasks 12–2 PM" }),
+            ("(nap|afternoon.*rest)", { _ in "User takes afternoon naps — don't schedule midday tasks" }),
         ]
         
         for (pattern, extractor) in schedulePatterns {
@@ -204,10 +204,10 @@ class ChatMemoryStore {
         
         // Constraint patterns
         let constraintPatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("周[一二三四五六日].*有课", { msg in extractConstraint(msg, prefix: "User") }),
-            ("每天.*点.*[上下]班", { msg in extractConstraint(msg, prefix: "User") }),
-            ("每周[一二三四五六日]", { msg in extractWeeklyPattern(msg) }),
-            ("固定.*时间", { msg in extractConstraint(msg, prefix: "User has a fixed schedule: ") }),
+            ("(have|has).*class.*(mon|tue|wed|thu|fri|sat|sun)", { msg in extractConstraint(msg, prefix: "User") }),
+            ("work.*(from|at).*\\d", { msg in extractConstraint(msg, prefix: "User") }),
+            ("every.*(mon|tue|wed|thu|fri|sat|sun)", { msg in extractWeeklyPattern(msg) }),
+            ("fixed.*schedule", { msg in extractConstraint(msg, prefix: "User has a fixed schedule: ") }),
         ]
         
         for (pattern, extractor) in constraintPatterns {
@@ -218,10 +218,10 @@ class ChatMemoryStore {
         
         // Task habit patterns
         let habitPatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("学习.*分[段钟]", { _ in "User prefers studying in shorter segments" }),
-            ("喜欢.*[一1]个小时", { _ in "User prefers 1-hour task durations" }),
-            ("不要.*太长", { _ in "User doesn't like long individual tasks" }),
-            ("番茄", { _ in "User uses the Pomodoro technique — 25 min work + 5 min break" }),
+            ("study.*(segment|chunk|block)", { _ in "User prefers studying in shorter segments" }),
+            ("(like|prefer).*1.*hour", { _ in "User prefers 1-hour task durations" }),
+            ("(don'?t|no).*too.*long", { _ in "User doesn't like long individual tasks" }),
+            ("pomodoro", { _ in "User uses the Pomodoro technique — 25 min work + 5 min break" }),
         ]
         
         for (pattern, extractor) in habitPatterns {
@@ -232,9 +232,9 @@ class ChatMemoryStore {
         
         // Lifestyle patterns
         let lifestylePatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("周末.*不.*[工作学习上班]", { _ in "User doesn't want work/study scheduled on weekends" }),
-            ("周末.*休息", { _ in "User prefers to rest on weekends" }),
-            ("周末.*[运动健身]", { _ in "User likes to exercise/work out on weekends" }),
+            ("weekend.*(no|don'?t).*(work|study)", { _ in "User doesn't want work/study scheduled on weekends" }),
+            ("weekend.*rest", { _ in "User prefers to rest on weekends" }),
+            ("weekend.*(exercise|gym|workout)", { _ in "User likes to exercise/work out on weekends" }),
         ]
         
         for (pattern, extractor) in lifestylePatterns {

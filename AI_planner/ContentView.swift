@@ -79,8 +79,7 @@ struct ContentView: View {
                 }
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
             default:
-                AIDebugView(todoViewModel: todoViewModel, chatViewModel: chatViewModel)
-                    .transition(.opacity)
+                EmptyView()
             }
         }
     }

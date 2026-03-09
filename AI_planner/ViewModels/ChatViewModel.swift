@@ -120,15 +120,6 @@ class ChatViewModel: ObservableObject {
     
     init() {
         loadChatHistory()
-        if messages.isEmpty {
-            messages = [
-                Message(
-                    content: "你好！我是你的 AI 日程助手。我可以帮你创建任务、规划日程、管理待办事项。\n\n试试说：\"帮我明天下午3点安排一个会议\" 或 \"帮我规划明天的安排\"",
-                    sender: .ai,
-                    timestamp: Date()
-                )
-            ]
-        }
         
         // Observe streaming text changes
         streamingObserver = chatService.$streamingText
@@ -249,13 +240,7 @@ class ChatViewModel: ObservableObject {
     func clearHistory() {
         chatService.resetConversation()
         UserDefaults.standard.removeObject(forKey: chatHistoryKey)
-        messages = [
-            Message(
-                content: "对话已清除！有什么可以帮你的？",
-                sender: .ai,
-                timestamp: Date()
-            )
-        ]
+        messages = []
     }
     
     // MARK: - Persistence

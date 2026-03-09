@@ -15,12 +15,12 @@ struct QuickPrompt: Identifiable {
 }
 
 private let quickPrompts: [QuickPrompt] = [
-    QuickPrompt(icon: "sun.max", label: "规划今天", prompt: "帮我规划今天的安排"),
-    QuickPrompt(icon: "calendar.badge.plus", label: "规划明天", prompt: "帮我规划明天的安排"),
-    QuickPrompt(icon: "calendar", label: "规划本周", prompt: "帮我规划这周剩余的安排"),
-    QuickPrompt(icon: "book", label: "学习计划", prompt: "帮我制定一个学习计划"),
-    QuickPrompt(icon: "figure.run", label: "健身计划", prompt: "帮我制定一个健身计划"),
-    QuickPrompt(icon: "list.bullet", label: "查看任务", prompt: "帮我总结一下目前所有的任务"),
+    QuickPrompt(icon: "sun.max", label: "Plan Today", prompt: "Help me plan today's schedule"),
+    QuickPrompt(icon: "calendar.badge.plus", label: "Plan Tomorrow", prompt: "Help me plan tomorrow's schedule"),
+    QuickPrompt(icon: "calendar", label: "Plan This Week", prompt: "Help me plan the rest of this week"),
+    QuickPrompt(icon: "book", label: "Study Plan", prompt: "Help me create a study plan"),
+    QuickPrompt(icon: "figure.run", label: "Fitness Plan", prompt: "Help me create a fitness plan"),
+    QuickPrompt(icon: "list.bullet", label: "View Tasks", prompt: "Help me summarize all my current tasks"),
 ]
 
 struct AIChatView: View {
@@ -135,11 +135,11 @@ struct AIChatView: View {
                 inputText = newValue
             }
         }
-        .alert("语音识别", isPresented: Binding(
+        .alert("Speech Recognition", isPresented: Binding(
             get: { speechService.errorMessage != nil },
             set: { if !$0 { speechService.errorMessage = nil } }
         )) {
-            Button("好的", role: .cancel) {
+            Button("OK", role: .cancel) {
                 speechService.errorMessage = nil
             }
         } message: {
@@ -257,7 +257,7 @@ struct AIChatView: View {
                 ZStack(alignment: .topLeading) {
                     // Placeholder
                     if inputText.isEmpty {
-                        Text(speechService.isRecording ? "正在听你说..." : "Ask me anything...")
+                        Text(speechService.isRecording ? "Listening..." : "Ask me anything...")
                             .font(AppTheme.Typography.bodyMedium)
                             .foregroundColor(speechService.isRecording ? AppTheme.accentCoral : AppTheme.textTertiary)
                             .padding(.horizontal, 5)
@@ -521,7 +521,7 @@ struct AIChatView: View {
                     .font(AppTheme.Typography.labelLarge)
                     .foregroundColor(AppTheme.accentGold)
 
-                Text("试试让河狸帮你安排今天，或者快速生成一个计划。")
+                Text("Let the beaver help you plan your day, or quickly generate a schedule.")
                     .font(AppTheme.Typography.bodySmall)
                     .foregroundColor(AppTheme.textSecondary)
             }

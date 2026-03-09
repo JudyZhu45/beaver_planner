@@ -63,18 +63,6 @@ struct CustomTabBar: View {
                     }
                 )
                 
-                Spacer()
-                
-                TabBarItem(
-                    icon: "ant.fill",
-                    label: "Debug",
-                    isSelected: selectedTab == 4,
-                    action: { 
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTab = 4 
-                        }
-                    }
-                )
             }
             .padding(.horizontal, AppTheme.Spacing.lg)
             .padding(.top, AppTheme.Spacing.md)

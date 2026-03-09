@@ -8,88 +8,88 @@
 import SwiftUI
 
 /**
- 河狸日程 - 温暖木质设计系统
- Color Palette: "Warm Beaver" - 奶油纸感、木质棕调、蜂蜜强调
+ Beaver Planner - Warm Wood Design System
+ Color Palette: "Warm Beaver" - Cream paper, wood brown tones, honey accents
  */
 struct AppTheme {
-    // MARK: - Primary Colors (河狸 IP 主视觉)
-    static let primaryDeepIndigo = Color(red: 0.541, green: 0.353, blue: 0.235) // 河狸棕 #8A5A3C
-    static let secondaryTeal = Color(red: 0.435, green: 0.647, blue: 0.490) // 苔藓绿 #6FA57D
-    static let accentCoral = Color(red: 0.875, green: 0.514, blue: 0.420) // 柔和陶土 #DF836B
-    static let accentGold = Color(red: 0.851, green: 0.643, blue: 0.255) // 蜂蜜金 #D9A441
-    static let accentLavender = Color(red: 0.780, green: 0.690, blue: 0.600) // 暖燕麦雾棕 #C7B099
+    // MARK: - Primary Colors (Beaver IP Main Visual)
+    static let primaryDeepIndigo = Color(red: 0.541, green: 0.353, blue: 0.235) // Beaver Brown #8A5A3C
+    static let secondaryTeal = Color(red: 0.435, green: 0.647, blue: 0.490) // Moss Green #6FA57D
+    static let accentCoral = Color(red: 0.875, green: 0.514, blue: 0.420) // Soft Terracotta #DF836B
+    static let accentGold = Color(red: 0.851, green: 0.643, blue: 0.255) // Honey Gold #D9A441
+    static let accentLavender = Color(red: 0.780, green: 0.690, blue: 0.600) // Warm Oat Mist #C7B099
     
-    // MARK: - Background Colors (奶油纸张感)
-    static let bgPrimary = Color(red: 0.969, green: 0.953, blue: 0.925) // 奶油底 #F7F3EC
-    static let bgSecondary = Color(red: 0.991, green: 0.982, blue: 0.967) // 象牙白 #FDFBF7
-    static let bgTertiary = Color(red: 0.944, green: 0.914, blue: 0.867) // 浅燕麦 #F1E9DD
-    static let bgElevated = Color(red: 0.998, green: 0.994, blue: 0.987) // 提升卡片 #FFFDFB
+    // MARK: - Background Colors (Cream Paper Feel)
+    static let bgPrimary = Color(red: 0.969, green: 0.953, blue: 0.925) // Cream #F7F3EC
+    static let bgSecondary = Color(red: 0.991, green: 0.982, blue: 0.967) // Ivory White #FDFBF7
+    static let bgTertiary = Color(red: 0.944, green: 0.914, blue: 0.867) // Light Oat #F1E9DD
+    static let bgElevated = Color(red: 0.998, green: 0.994, blue: 0.987) // Elevated Card #FFFDFB
     static let bgOverlay = Color(red: 0.216, green: 0.153, blue: 0.102).opacity(0.14)
     
     // MARK: - Text Colors
-    static let textPrimary = Color(red: 0.231, green: 0.169, blue: 0.122) // 深胡桃 #3B2B1F
-    static let textSecondary = Color(red: 0.482, green: 0.408, blue: 0.353) // 可可灰棕 #7B685A
-    static let textTertiary = Color(red: 0.655, green: 0.580, blue: 0.514) // 柔和棕灰 #A79483
+    static let textPrimary = Color(red: 0.231, green: 0.169, blue: 0.122) // Dark Walnut #3B2B1F
+    static let textSecondary = Color(red: 0.482, green: 0.408, blue: 0.353) // Cocoa Gray #7B685A
+    static let textTertiary = Color(red: 0.655, green: 0.580, blue: 0.514) // Soft Brown Gray #A79483
     static let textInverse = Color.white
     
     // MARK: - Semantic Colors
-    static let borderColor = Color(red: 0.890, green: 0.847, blue: 0.780) // 温柔描边 #E3D8C7
-    static let dividerColor = Color(red: 0.914, green: 0.882, blue: 0.831) // 分隔 #E9E1D4
+    static let borderColor = Color(red: 0.890, green: 0.847, blue: 0.780) // Soft Border #E3D8C7
+    static let dividerColor = Color(red: 0.914, green: 0.882, blue: 0.831) // Divider #E9E1D4
     static let shadowColor = Color(red: 0.231, green: 0.169, blue: 0.122).opacity(0.10)
     
-    // MARK: - Event Type Colors (河狸自然色系)
+    // MARK: - Event Type Colors (Beaver Natural Palette)
     static let eventColors: [EventColor] = [
-        // Gym - 陶土棕 (运动=力量)
+        // Gym - Terracotta (Strength)
         EventColor(
             name: "Gym",
             icon: "dumbbell.fill",
-            light: Color(red: 0.965, green: 0.935, blue: 0.910),  // 浅陶土
-            primary: Color(red: 0.690, green: 0.440, blue: 0.290), // 陶土棕
-            dark: Color(red: 0.490, green: 0.300, blue: 0.180)     // 深陶土
+            light: Color(red: 0.965, green: 0.935, blue: 0.910),  // Light Terracotta
+            primary: Color(red: 0.690, green: 0.440, blue: 0.290), // Terracotta
+            dark: Color(red: 0.490, green: 0.300, blue: 0.180)     // Dark Terracotta
         ),
-        // Class - 湖蓝 (学习=清澈)
+        // Class - Lake Blue (Clarity)
         EventColor(
             name: "Class",
             icon: "book.fill",
-            light: Color(red: 0.918, green: 0.945, blue: 0.973),  // 浅湖蓝
-            primary: Color(red: 0.340, green: 0.565, blue: 0.780), // 湖蓝
-            dark: Color(red: 0.220, green: 0.420, blue: 0.630)     // 深湖蓝
+            light: Color(red: 0.918, green: 0.945, blue: 0.973),  // Light Lake Blue
+            primary: Color(red: 0.340, green: 0.565, blue: 0.780), // Lake Blue
+            dark: Color(red: 0.220, green: 0.420, blue: 0.630)     // Dark Lake Blue
         ),
-        // Study - 森林绿 (研究=生长)
+        // Study - Forest Green (Growth)
         EventColor(
             name: "Study",
             icon: "pencil.circle.fill",
-            light: Color(red: 0.920, green: 0.957, blue: 0.930),  // 浅森绿
-            primary: Color(red: 0.380, green: 0.616, blue: 0.478), // 森林绿
-            dark: Color(red: 0.265, green: 0.470, blue: 0.350)     // 深森绿
+            light: Color(red: 0.920, green: 0.957, blue: 0.930),  // Light Forest Green
+            primary: Color(red: 0.380, green: 0.616, blue: 0.478), // Forest Green
+            dark: Color(red: 0.265, green: 0.470, blue: 0.350)     // Dark Forest Green
         ),
-        // Meeting - 蜂蜜黄 (会议=协作)
+        // Meeting - Honey (Collaboration)
         EventColor(
             name: "Meeting",
             icon: "person.2.fill",
-            light: Color(red: 0.975, green: 0.955, blue: 0.910),  // 浅蜂蜜
-            primary: Color(red: 0.820, green: 0.650, blue: 0.380), // 蜂蜜黄
-            dark: Color(red: 0.650, green: 0.490, blue: 0.250)     // 深蜂蜜
+            light: Color(red: 0.975, green: 0.955, blue: 0.910),  // Light Honey
+            primary: Color(red: 0.820, green: 0.650, blue: 0.380), // Honey
+            dark: Color(red: 0.650, green: 0.490, blue: 0.250)     // Dark Honey
         ),
-        // Dinner - 秋橙 (社交=温暖)
+        // Dinner - Autumn Orange (Warmth)
         EventColor(
             name: "Dinner",
             icon: "fork.knife",
-            light: Color(red: 0.975, green: 0.930, blue: 0.915),  // 浅秋橙
-            primary: Color(red: 0.867, green: 0.435, blue: 0.341), // 秋橙
-            dark: Color(red: 0.700, green: 0.320, blue: 0.235)     // 深秋橙
+            light: Color(red: 0.975, green: 0.930, blue: 0.915),  // Light Autumn Orange
+            primary: Color(red: 0.867, green: 0.435, blue: 0.341), // Autumn Orange
+            dark: Color(red: 0.700, green: 0.320, blue: 0.235)     // Dark Autumn Orange
         ),
-        // Other - 暖石灰 (其他)
+        // Other - Warm Gray
         EventColor(
             name: "Other",
             icon: "circle.fill",
-            light: Color(red: 0.950, green: 0.940, blue: 0.925),  // 浅石灰
-            primary: Color(red: 0.565, green: 0.510, blue: 0.440), // 暖石灰
-            dark: Color(red: 0.420, green: 0.375, blue: 0.316)     // 深石灰
+            light: Color(red: 0.950, green: 0.940, blue: 0.925),  // Light Warm Gray
+            primary: Color(red: 0.565, green: 0.510, blue: 0.440), // Warm Gray
+            dark: Color(red: 0.420, green: 0.375, blue: 0.316)     // Dark Warm Gray
         ),
     ]
     
-    // MARK: - Typography Scale (rounded 设计, 温暖亲和)
+    // MARK: - Typography Scale (Rounded, Warm & Friendly)
     enum Typography {
         static let displayLarge = Font.system(size: 32, weight: .bold, design: .rounded)
         static let displayMedium = Font.system(size: 28, weight: .bold, design: .rounded)

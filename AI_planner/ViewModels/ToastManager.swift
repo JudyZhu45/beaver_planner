@@ -35,7 +35,7 @@ enum ToastType {
         switch self {
         case .success: return AppTheme.secondaryTeal
         case .error: return AppTheme.accentCoral
-        case .warning: return Color(red: 0.820, green: 0.650, blue: 0.380) // 蜂蜜黄
+        case .warning: return Color(red: 0.820, green: 0.650, blue: 0.380) // Honey Gold
         case .info: return AppTheme.primaryDeepIndigo
         }
     }

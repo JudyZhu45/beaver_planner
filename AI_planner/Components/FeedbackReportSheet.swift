@@ -258,8 +258,8 @@ private struct FeedbackCategoryChip: View {
 
 #Preview {
     FeedbackReportSheet(
-        userMessage: "帮我明天安排去看医生的任务，时间你定",
-        aiResponse: "好的，我会为你安排明天去看医生的任务。考虑到你的工作和学习时间是 10:00 到 21:00，我会尽量安排在工作时间之外，以避免冲突。\n\n建议将看医生的任务安排在明天上午 9 点到 10 点之间。",
+        userMessage: "Help me schedule a doctor visit for tomorrow, you pick the time",
+        aiResponse: "Sure, I'll schedule a doctor visit for tomorrow. Considering your work and study hours are 10:00 to 21:00, I'll try to schedule it outside of those hours to avoid conflicts.\n\nI suggest scheduling the doctor visit tomorrow morning between 9:00 and 10:00 AM.",
         onDismiss: {}
     )
 }

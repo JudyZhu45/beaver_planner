@@ -3,7 +3,7 @@
 //  AI_planner
 //
 //  Created by AI Assistant on 3/5/26.
-//  演示新组件的使用方法
+//  Demo view for new components
 //
 
 import SwiftUI
@@ -26,7 +26,7 @@ struct DemoView: View {
                     
                     Spacer()
                     
-                    Button("重新加载") {
+                    Button("Reload") {
                         showLoading = true
                     }
                     .font(.caption)
@@ -37,9 +37,9 @@ struct DemoView: View {
                 
                 // Tab selector
                 Picker("", selection: $selectedTab) {
-                    Text("📝 任务").tag(0)
-                    Text("📅 日历").tag(1)
-                    Text("📊 分析").tag(2)
+                    Text("📝 Tasks").tag(0)
+                    Text("📅 Calendar").tag(1)
+                    Text("📊 Analytics").tag(2)
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
@@ -68,14 +68,14 @@ struct DemoView: View {
                 
                 // Instructions
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("✨ 本次更新内容")
+                    Text("✨ What's New")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(AppTheme.textPrimary)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("• LoadingScreen - 启动页动画")
-                        Text("• EmptyStateView - 空状态设计")
-                        Text("• CelebrationView - 完成庆祝动效")
+                        Text("• LoadingScreen - Launch animation")
+                        Text("• EmptyStateView - Empty state design")
+                        Text("• CelebrationView - Completion celebration effect")
                     }
                     .font(.caption)
                     .foregroundColor(AppTheme.textSecondary)
