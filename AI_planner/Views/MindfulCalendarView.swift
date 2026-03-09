@@ -1,10 +1,3 @@
-//
-//  MindfulCalendarView.swift
-//  AI_planner
-//
-//  Created by Judy459 on 2/19/26.
-//
-
 import SwiftUI
 
 struct MindfulCalendarView: View {
@@ -13,6 +6,7 @@ struct MindfulCalendarView: View {
     @State private var selectedDate = Date()
     @State private var showDailyDetail = false
     @State private var showAddEventSheet = false
+    @State private var isMonthlyExpanded = false
     @Namespace private var calendarNamespace
     
     var body: some View {
@@ -37,7 +31,7 @@ struct MindfulCalendarView: View {
                     endRadius: 260
                 )
             )
-                .ignoresSafeArea()
+            .ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header
@@ -48,9 +42,10 @@ struct MindfulCalendarView: View {
                                 .font(AppTheme.Typography.displayMedium)
                                 .foregroundColor(AppTheme.primaryDeepIndigo)
 
-                            Text("See your rhythm, spot busy days, and zoom into the details.")
+                            Text(isMonthlyExpanded ? "See your rhythm, spot busy days." : "Your week at a glance.")
                                 .font(AppTheme.Typography.bodySmall)
                                 .foregroundColor(AppTheme.textSecondary)
+                                .contentTransition(.opacity)
                         }
 
                         Spacer()
@@ -68,85 +63,84 @@ struct MindfulCalendarView: View {
                             )
                     }
                     
-                    // Month/Year Selector
+                    // Time Selector (Month/Year & Expand Toggle)
                     HStack {
-                        Button(action: { previousMonth() }) {
+                        Button(action: { previousTimePeriod() }) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(AppTheme.primaryDeepIndigo)
                                 .frame(width: 38, height: 38)
                                 .background(AppTheme.bgElevated)
                                 .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1)
-                                )
+                                .overlay(Circle().stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1))
                         }
                         
                         Spacer()
                         
-                        Text(CalendarHelper.getMonthYearString(date: currentMonth))
-                            .font(AppTheme.Typography.headlineLarge)
-                            .foregroundColor(AppTheme.primaryDeepIndigo)
+                        // Tappable Header to Expand/Collapse the Grid vs Weekly Chart
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                isMonthlyExpanded.toggle()
+                                if isMonthlyExpanded { currentMonth = selectedDate }
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Text(CalendarHelper.getMonthYearString(date: isMonthlyExpanded ? currentMonth : selectedDate))
+                                    .font(AppTheme.Typography.headlineLarge)
+                                    .foregroundColor(AppTheme.primaryDeepIndigo)
+                                
+                                Image(systemName: isMonthlyExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(AppTheme.accentGold)
+                            }
+                        }
                         
                         Spacer()
                         
-                        Button(action: { nextMonth() }) {
+                        Button(action: { nextTimePeriod() }) {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(AppTheme.primaryDeepIndigo)
                                 .frame(width: 38, height: 38)
                                 .background(AppTheme.bgElevated)
                                 .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1)
-                                )
+                                .overlay(Circle().stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1))
                         }
                     }
                 }
                 .padding(AppTheme.Spacing.lg)
-                .background(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(AppTheme.bgElevated.opacity(0.96))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(AppTheme.borderColor.opacity(0.78), lineWidth: 1)
-                )
+                .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(AppTheme.bgElevated.opacity(0.96)))
+                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(AppTheme.borderColor.opacity(0.78), lineWidth: 1))
                 .shadow(color: AppTheme.Shadows.md.color, radius: AppTheme.Shadows.md.radius, x: AppTheme.Shadows.md.x, y: AppTheme.Shadows.md.y)
                 .padding(.horizontal, AppTheme.Spacing.lg)
                 .padding(.top, AppTheme.Spacing.md)
+                .zIndex(1)
                 
-                ScrollView {
+                // Content Area
+                ScrollView(showsIndicators: false) {
                     VStack(spacing: AppTheme.Spacing.xxl) {
-                        // Calendar Grid
-                        CalendarGridView(
-                            currentMonth: $currentMonth,
-                            selectedDate: $selectedDate,
-                            tasks: viewModel.todos,
-                            namespace: calendarNamespace,
-                            showDailyDetail: $showDailyDetail
-                        )
-                        .padding(.horizontal, AppTheme.Spacing.lg)
-                        
-                        // Selected Day Preview
-                        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                            SectionHeader(title: "Day Preview", icon: "calendar.circle.fill")
-                                .padding(.horizontal, AppTheme.Spacing.lg)
-                            
-                            SelectedDayPreviewView(
-                                date: selectedDate,
-                                tasks: CalendarHelper.getTasksForDay(viewModel.todos, date: selectedDate),
-                                namespace: calendarNamespace,
+                        if isMonthlyExpanded {
+                            CalendarGridView(
+                                currentMonth: $currentMonth,
+                                selectedDate: $selectedDate,
                                 showDailyDetail: $showDailyDetail,
-                                onAddEvent: { showAddEventSheet = true }
+                                tasks: viewModel.todos,
+                                namespace: calendarNamespace
                             )
                             .padding(.horizontal, AppTheme.Spacing.lg)
+                            .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.95)), removal: .opacity.combined(with: .scale(scale: 0.95))))
+                        } else {
+                            VerticalWeeklyChartView(
+                                selectedDate: $selectedDate,
+                                showDailyDetail: $showDailyDetail,
+                                tasks: viewModel.todos,
+                                namespace: calendarNamespace
+                            )
+                            .padding(.horizontal, AppTheme.Spacing.lg)
+                            .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 1.05)), removal: .opacity.combined(with: .scale(scale: 1.05))))
                         }
                         
-                        Spacer()
-                            .frame(height: AppTheme.Spacing.lg)
+                        Spacer().frame(height: AppTheme.Spacing.lg)
                     }
                     .padding(.top, AppTheme.Spacing.lg)
                 }
@@ -166,28 +160,153 @@ struct MindfulCalendarView: View {
         }
     }
     
-    func previousMonth() {
+    // MARK: - Navigation Logic
+    func previousTimePeriod() {
         let calendar = Calendar.current
-        if let newMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) {
-            currentMonth = newMonth
+        withAnimation(.easeInOut) {
+            if isMonthlyExpanded {
+                if let newMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) {
+                    currentMonth = newMonth
+                }
+            } else {
+                if let newWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: selectedDate) {
+                    selectedDate = newWeek
+                    currentMonth = selectedDate
+                }
+            }
         }
     }
     
-    func nextMonth() {
+    func nextTimePeriod() {
         let calendar = Calendar.current
-        if let newMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) {
-            currentMonth = newMonth
+        withAnimation(.easeInOut) {
+            if isMonthlyExpanded {
+                if let newMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) {
+                    currentMonth = newMonth
+                }
+            } else {
+                if let newWeek = calendar.date(byAdding: .weekOfYear, value: 1, to: selectedDate) {
+                    selectedDate = newWeek
+                    currentMonth = selectedDate
+                }
+            }
         }
     }
 }
 
-// MARK: - Calendar Grid View
+// MARK: - Vertical Weekly Chart View
+struct VerticalWeeklyChartView: View {
+    @Binding var selectedDate: Date
+    @Binding var showDailyDetail: Bool
+    var tasks: [TodoTask]
+    var namespace: Namespace.ID
+    
+    var currentWeek: [Date] {
+        let calendar = Calendar.current
+        let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: selectedDate)) ?? selectedDate
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: startOfWeek) }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(currentWeek.enumerated()), id: \.element) { index, date in
+                let isSelected = CalendarHelper.isSameDay(date, selectedDate)
+                let isToday = CalendarHelper.isSameDay(date, Date())
+                let dayTasks = CalendarHelper.getTasksForDay(tasks, date: date)
+                
+                // Determine Weekday vs Weekend colors
+                let weekday = Calendar.current.component(.weekday, from: date)
+                let isWeekend = (weekday == 1 || weekday == 7) // 1 = Sun, 7 = Sat
+                
+                // Formal for weekdays, Exciting for weekends
+                let baseColor = isWeekend ? AppTheme.accentGold : AppTheme.primaryDeepIndigo
+                let baseOpacity = isWeekend ? 0.20 : 0.08
+                let blockColor = baseColor.opacity(isSelected ? baseOpacity + 0.15 : baseOpacity)
+                
+                HStack(spacing: 0) {
+                    // Left Column: Colored Block
+                    VStack(spacing: 2) {
+                        Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                            .font(AppTheme.Typography.labelMedium)
+                            .foregroundColor(isToday ? AppTheme.accentGold : AppTheme.textSecondary)
+                        
+                        Text(date.formatted(.dateTime.day()))
+                            .font(AppTheme.Typography.titleMedium)
+                            .foregroundColor(isToday ? AppTheme.accentGold : AppTheme.primaryDeepIndigo)
+                    }
+                    .frame(width: 70)
+                    .frame(maxHeight: .infinity)
+                    .background(blockColor)
+                    
+                    // Vertical Separator Line
+                    Rectangle()
+                        .fill(AppTheme.borderColor.opacity(0.8))
+                        .frame(width: 1)
+                    
+                    // Right Column: Lined Space / Tasks
+                    VStack(alignment: .leading, spacing: 8) {
+                        if dayTasks.isEmpty {
+                            Spacer()
+                        } else {
+                            ForEach(dayTasks.prefix(4)) { task in
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(getEventColor(for: task).primary)
+                                        .frame(width: 6, height: 6)
+                                    Text(task.title)
+                                        .font(AppTheme.Typography.bodySmall)
+                                        .foregroundColor(AppTheme.textPrimary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            if dayTasks.count > 4 {
+                                Text("+\(dayTasks.count - 4) more")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppTheme.textTertiary)
+                                    .padding(.leading, 14)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(isSelected ? AppTheme.bgTertiary.opacity(0.3) : Color.clear)
+                }
+                .frame(minHeight: 80) // Taller rows to fill up the newly available screen space
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedDate = date
+                        showDailyDetail = true // Open detail immediately
+                    }
+                }
+                
+                // Horizontal Divider Line between days
+                if index < 6 {
+                    Divider()
+                        .background(AppTheme.borderColor.opacity(0.8))
+                }
+            }
+        }
+        .background(AppTheme.bgElevated)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg))
+        .overlay(RoundedRectangle(cornerRadius: AppTheme.Radius.lg).stroke(AppTheme.borderColor.opacity(0.9), lineWidth: 1))
+        .shadow(color: AppTheme.Shadows.sm.color, radius: AppTheme.Shadows.sm.radius, x: AppTheme.Shadows.sm.x, y: AppTheme.Shadows.sm.y)
+    }
+    
+    func getEventColor(for task: TodoTask) -> EventColor {
+        return AppTheme.eventColors.first { $0.name.lowercased() == task.eventType.rawValue.lowercased() } ?? AppTheme.eventColors[5]
+    }
+}
+
+// MARK: - Monthly Calendar Grid View
 struct CalendarGridView: View {
     @Binding var currentMonth: Date
     @Binding var selectedDate: Date
+    @Binding var showDailyDetail: Bool
     var tasks: [TodoTask]
     var namespace: Namespace.ID
-    @Binding var showDailyDetail: Bool
     
     let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     
@@ -196,59 +315,39 @@ struct CalendarGridView: View {
             // Day Labels
             HStack(spacing: 0) {
                 ForEach(dayLabels, id: \.self) { day in
-                    VStack {
-                        Text(day)
-                            .font(AppTheme.Typography.labelMedium)
-                            .foregroundColor(AppTheme.textSecondary)
-                            .textCase(.uppercase)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
+                    Text(day)
+                        .font(AppTheme.Typography.labelMedium)
+                        .foregroundColor(AppTheme.textSecondary)
+                        .textCase(.uppercase)
+                        .frame(maxWidth: .infinity)
                 }
             }
             
-            // Calendar Days
             let daysInMonth = CalendarHelper.getDaysInMonth(date: currentMonth)
-            let firstDay = CalendarHelper.getFirstDayOfMonth(date: currentMonth)
-            let dayRange = 1...daysInMonth
-            
+            let firstDayOffset = CalendarHelper.getFirstDayOfMonth(date: currentMonth)
             let columns = Array(repeating: GridItem(.flexible()), count: 7)
             
             LazyVGrid(columns: columns, spacing: AppTheme.Spacing.md) {
-                // Empty cells for days before month starts
-                ForEach(0..<firstDay, id: \.self) { _ in
-                    Color.clear
-                        .frame(height: 60)
+                if firstDayOffset > 0 {
+                    ForEach(-firstDayOffset..<0, id: \.self) { _ in
+                        Color.clear.frame(height: 60)
+                    }
                 }
                 
-                // Days of month
-                ForEach(dayRange, id: \.self) { day in
+                ForEach(1...daysInMonth, id: \.self) { day in
                     let date = CalendarHelper.getDateFromDay(day, in: currentMonth)
                     let isSelected = CalendarHelper.isSameDay(date, selectedDate)
                     let isToday = CalendarHelper.isSameDay(date, Date())
                     let dayTasks = CalendarHelper.getTasksForDay(tasks, date: date)
                     
                     ZStack {
-                        // Selected background
                         if isSelected {
                             RoundedRectangle(cornerRadius: AppTheme.Radius.md)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            AppTheme.accentGold.opacity(0.18),
-                                            AppTheme.secondaryTeal.opacity(0.14)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .matchedGeometryEffect(id: "selectedCircle", in: namespace)
+                                .fill(LinearGradient(colors: [AppTheme.accentGold.opacity(0.18), AppTheme.secondaryTeal.opacity(0.14)], startPoint: .topLeading, endPoint: .bottomTrailing))
                         } else if isToday {
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.md)
-                                .stroke(AppTheme.accentGold, lineWidth: 1.5)
+                            RoundedRectangle(cornerRadius: AppTheme.Radius.md).stroke(AppTheme.accentGold, lineWidth: 1.5)
                         } else {
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.md)
-                                .fill(AppTheme.bgElevated.opacity(0.55))
+                            RoundedRectangle(cornerRadius: AppTheme.Radius.md).fill(AppTheme.bgElevated.opacity(0.55))
                         }
                         
                         VStack(spacing: 4) {
@@ -256,7 +355,6 @@ struct CalendarGridView: View {
                                 .font(AppTheme.Typography.headlineSmall)
                                 .foregroundColor(isSelected ? AppTheme.primaryDeepIndigo : AppTheme.textPrimary)
                             
-                            // Task indicators
                             if !dayTasks.isEmpty {
                                 HStack(spacing: 2) {
                                     ForEach(0..<min(3, dayTasks.count), id: \.self) { index in
@@ -264,148 +362,26 @@ struct CalendarGridView: View {
                                             .fill(getEventColor(for: dayTasks[index]).primary)
                                             .frame(width: 4, height: 4)
                                     }
-                                    
-                                    if dayTasks.count > 3 {
-                                        Text("+\(dayTasks.count - 3)")
-                                            .font(AppTheme.Typography.labelSmall)
-                                            .foregroundColor(AppTheme.textSecondary)
-                                    }
                                 }
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .frame(height: 60)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.md)
-                            .stroke(isSelected ? AppTheme.accentGold.opacity(0.1) : AppTheme.borderColor.opacity(0.45), lineWidth: 1)
-                    )
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             selectedDate = date
+                            showDailyDetail = true // Open detail immediately
                         }
                     }
                 }
             }
         }
         .padding(AppTheme.Spacing.md)
-    .background(AppTheme.bgElevated)
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppTheme.Radius.lg)
-        .stroke(AppTheme.borderColor.opacity(0.9), lineWidth: 1)
-        )
-    .shadow(color: AppTheme.Shadows.sm.color, radius: AppTheme.Shadows.sm.radius, x: AppTheme.Shadows.sm.x, y: AppTheme.Shadows.sm.y)
-    }
-    
-    func getEventColor(for task: TodoTask) -> EventColor {
-        return AppTheme.eventColors.first { $0.name.lowercased() == task.eventType.rawValue.lowercased() } ?? AppTheme.eventColors[5]
-    }
-}
-
-// MARK: - Selected Day Preview
-struct SelectedDayPreviewView: View {
-    var date: Date
-    var tasks: [TodoTask]
-    var namespace: Namespace.ID
-    @Binding var showDailyDetail: Bool
-    var onAddEvent: () -> Void = {}
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(date, format: .dateTime.weekday(.wide))
-                        .font(AppTheme.Typography.headlineSmall)
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Text(date, format: .dateTime.month().day().year())
-                        .font(AppTheme.Typography.bodySmall)
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-                
-                Spacer()
-                
-                Button(action: { showDailyDetail = true }) {
-                    HStack(spacing: 4) {
-                        Text("View All")
-                            .font(AppTheme.Typography.labelMedium)
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundColor(AppTheme.primaryDeepIndigo)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(AppTheme.bgElevated)
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(AppTheme.borderColor.opacity(0.8), lineWidth: 1)
-                    )
-                }
-            }
-            
-            if tasks.isEmpty {
-                EmptyStateView(type: .calendar, action: onAddEvent)
-                .background(AppTheme.bgTertiary.opacity(0.55))
-                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
-            } else {
-                VStack(spacing: AppTheme.Spacing.sm) {
-                    ForEach(tasks, id: \.id) { task in
-                        let color = getEventColor(for: task)
-                        
-                        HStack(spacing: AppTheme.Spacing.md) {
-                            Image(systemName: color.icon)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(color.primary)
-                                .frame(width: 28, height: 28)
-                                .background(color.light)
-                                .clipShape(Circle())
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(task.title)
-                                    .font(AppTheme.Typography.bodyMedium)
-                                    .foregroundColor(AppTheme.textPrimary)
-                                
-                                if let startTime = task.startTime {
-                                    Text(CalendarHelper.timeString(from: startTime))
-                                        .font(AppTheme.Typography.labelSmall)
-                                        .foregroundColor(AppTheme.textSecondary)
-                                }
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(AppTheme.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.md, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            color.light.opacity(0.82),
-                                            AppTheme.bgElevated
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.md))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.md)
-                                .stroke(color.primary.opacity(0.16), lineWidth: 1)
-                        )
-                    }
-                }
-            }
-        }
-        .padding(AppTheme.Spacing.lg)
         .background(AppTheme.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppTheme.Radius.lg)
-                .stroke(AppTheme.borderColor.opacity(0.9), lineWidth: 1)
-        )
+        .overlay(RoundedRectangle(cornerRadius: AppTheme.Radius.lg).stroke(AppTheme.borderColor.opacity(0.9), lineWidth: 1))
         .shadow(color: AppTheme.Shadows.sm.color, radius: AppTheme.Shadows.sm.radius, x: AppTheme.Shadows.sm.x, y: AppTheme.Shadows.sm.y)
     }
     
