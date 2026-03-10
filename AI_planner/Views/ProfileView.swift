@@ -196,11 +196,11 @@ struct ProfileView: View {
             }
             
             VStack(spacing: AppTheme.Spacing.xs) {
-                Text(authManager.userEmail ?? "AI Planner User")
+                Text(ProfileManager.shared.activeProfile.name)
                     .font(AppTheme.Typography.headlineSmall)
                     .foregroundColor(AppTheme.textPrimary)
                 
-                Text("Organize your schedule with intelligence")
+                Text(authManager.userEmail ?? "AI Planner User")
                     .font(AppTheme.Typography.bodySmall)
                     .foregroundColor(AppTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -386,6 +386,41 @@ struct ProfileView: View {
                                  : "Disabled")
                                 .font(AppTheme.Typography.labelSmall)
                                 .foregroundColor(AppTheme.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.lg)
+                    .padding(.vertical, AppTheme.Spacing.md)
+                }
+                
+                Divider()
+                    .padding(.leading, 48)
+                
+                // Profiles row
+                NavigationLink {
+                    ProfileManagementView()
+                } label: {
+                    HStack(spacing: AppTheme.Spacing.md) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.accentGold)
+                            .frame(width: 28, height: 28)
+                            .background(AppTheme.accentGold.opacity(0.1))
+                            .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Profiles")
+                                .font(AppTheme.Typography.bodyMedium)
+                                .foregroundColor(AppTheme.textPrimary)
+                            
+                            Text(ProfileManager.shared.activeProfile.name)
+                                .font(AppTheme.Typography.labelSmall)
+                                .foregroundColor(AppTheme.textTertiary)
                         }
                         
                         Spacer()

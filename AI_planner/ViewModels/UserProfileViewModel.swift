@@ -14,11 +14,21 @@ class UserProfileViewModel: ObservableObject {
     
     @Published var profile: UserProfile = .empty
     
-    private let storageKey = "UserProfileData"
+    private let baseStorageKey = "UserProfileData"
+    private var storageKey: String { ProfileManager.activeScopedKey(baseStorageKey) }
     private let analyzer = BehaviorAnalyzer.shared
     
     private init() {
         loadProfile()
+        NotificationCenter.default.addObserver(
+            forName: .profileDidSwitch,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.loadProfile()
+            }
+        }
     }
     
     /// Rebuild user profile from behavior data and tasks

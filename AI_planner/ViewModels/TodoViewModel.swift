@@ -13,12 +13,21 @@ class TodoViewModel: ObservableObject {
     @Published var todos: [TodoTask] = []
     @Published var showAddTodoSheet = false
     
-    private let todosKey = "SavedTodos"
+    private let baseTodosKey = "SavedTodos"
+    private var todosKey: String { ProfileManager.activeScopedKey(baseTodosKey) }
     private let calendarSync = CalendarSyncService.shared
     private let behaviorStore = UserBehaviorStore.shared
     
     init() {
         loadTodos()
+        // Listen for profile switches to reload data
+        NotificationCenter.default.addObserver(
+            forName: .profileDidSwitch,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadTodos()
+        }
     }
     
     // MARK: - CRUD Operations

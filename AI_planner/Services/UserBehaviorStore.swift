@@ -61,13 +61,21 @@ struct BehaviorContext: Codable {
 class UserBehaviorStore {
     static let shared = UserBehaviorStore()
     
-    private let storageKey = "UserBehaviorRecords"
+    private let baseStorageKey = "UserBehaviorRecords"
+    private var storageKey: String { ProfileManager.activeScopedKey(baseStorageKey) }
     private let maxRecords = 500 // Keep last 500 records to manage storage
     
     private(set) var records: [BehaviorRecord] = []
     
     private init() {
         loadRecords()
+        NotificationCenter.default.addObserver(
+            forName: .profileDidSwitch,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadRecords()
+        }
     }
     
     // MARK: - Record Behaviors
