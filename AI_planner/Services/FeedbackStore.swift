@@ -75,6 +75,8 @@ final class FeedbackStore {
     func submit(_ entry: FeedbackEntry) {
         entries.append(entry)
         persist()
+        // Also upload to Notion so the developer receives it in the cloud
+        FeedbackUploader.shared.upload(entry)
     }
 
     // MARK: - Export as JSON string (for developer copy/paste)

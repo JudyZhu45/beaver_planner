@@ -29,7 +29,6 @@ struct AIChatView: View {
 
     // Beta feedback
     @State private var reportingMessage: Message? = nil
-    @State private var showFeedbackSheet = false
     
     var body: some View {
         ZStack {
@@ -77,7 +76,6 @@ struct AIChatView: View {
                                     },
                                     onReport: message.sender == .ai && !message.isStreaming && !message.isError ? {
                                         reportingMessage = message
-                                        showFeedbackSheet = true
                                     } : nil
                                 )
                                 .id(message.id)
@@ -145,16 +143,14 @@ struct AIChatView: View {
         } message: {
             Text(speechService.errorMessage ?? "")
         }
-        .sheet(isPresented: $showFeedbackSheet) {
-            if let msg = reportingMessage {
-                let aiIndex = chatViewModel.messages.firstIndex(where: { $0.id == msg.id }) ?? 0
-                let userMsg = aiIndex > 0 ? chatViewModel.messages[aiIndex - 1].content : ""
-                FeedbackReportSheet(
-                    userMessage: userMsg,
-                    aiResponse: msg.content,
-                    onDismiss: { showFeedbackSheet = false }
-                )
-            }
+        .sheet(item: $reportingMessage) { msg in
+            let aiIndex = chatViewModel.messages.firstIndex(where: { $0.id == msg.id }) ?? 0
+            let userMsg = aiIndex > 0 ? chatViewModel.messages[aiIndex - 1].content : ""
+            FeedbackReportSheet(
+                userMessage: userMsg,
+                aiResponse: msg.content,
+                onDismiss: { reportingMessage = nil }
+            )
         }
     }
     
