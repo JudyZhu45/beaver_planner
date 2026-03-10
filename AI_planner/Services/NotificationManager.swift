@@ -8,15 +8,48 @@
 import Foundation
 import UserNotifications
 
+// MARK: - Notification Settings Model
+
+struct NotificationSettings: Codable {
+    /// Master switch
+    var isEnabled: Bool = true
+    /// Remind X minutes before a task starts (nil = disabled)
+    var minutesBefore: Int? = 15
+    /// Fire a notification exactly when a task starts
+    var notifyOnStart: Bool = false
+    /// Fire a notification when a task's end time arrives
+    var notifyOnFinish: Bool = false
+
+    private static let storageKey = "NotificationSettingsV1"
+
+    static func load() -> NotificationSettings {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let s = try? JSONDecoder().decode(NotificationSettings.self, from: data)
+        else { return NotificationSettings() }
+        return s
+    }
+
+    func save() {
+        if let data = try? JSONEncoder().encode(self) {
+            UserDefaults.standard.set(data, forKey: NotificationSettings.storageKey)
+        }
+    }
+}
+
+// MARK: - Notification Manager
+
 class NotificationManager {
     static let shared = NotificationManager()
-    
+
     private let center = UNUserNotificationCenter.current()
-    
+
+    /// Live settings — mutate then call settings.save() to persist
+    var settings: NotificationSettings = .load()
+
     private init() {}
-    
+
     // MARK: - Permission
-    
+
     func requestAuthorization() async -> Bool {
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
@@ -26,199 +59,179 @@ class NotificationManager {
             return false
         }
     }
-    
+
     // MARK: - Schedule Notifications
-    
-    /// Schedule a notification for a task. Events with startTime get a 15-min-before reminder.
-    /// Todos without startTime get a morning reminder on the due date.
+
+    /// Schedule all enabled notification types for a single task.
     func scheduleNotification(for task: TodoTask) {
-        // Don't schedule for completed tasks or past dates
-        guard !task.isCompleted else { return }
-        
-        // Cancel any existing notification for this task first
+        guard !task.isCompleted, settings.isEnabled else { return }
         cancelNotification(for: task)
-        
-        let content = UNMutableNotificationContent()
-        content.title = task.title
-        content.sound = .default
-        
+
         let calendar = Calendar.current
-        var triggerDate: Date?
-        
-        if let startTime = task.startTime {
-            // Event with start time: remind 15 minutes before
-            content.body = task.description.isEmpty
-                ? "Starting in 15 minutes"
-                : "\(task.description) — Starting in 15 minutes"
-            triggerDate = calendar.date(byAdding: .minute, value: -15, to: startTime)
-        } else {
-            // Todo without start time: remind at 8:00 AM on due date
-            content.body = task.description.isEmpty
-                ? "Due today"
-                : "\(task.description) — Due today"
-            triggerDate = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: task.dueDate)
-        }
-        
-        guard let fireDate = triggerDate, fireDate > Date() else { return }
-        
-        let components = calendar.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: fireDate
-        )
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        let request = UNNotificationRequest(
-            identifier: task.id.uuidString,
-            content: content,
-            trigger: trigger
-        )
-        
-        center.add(request) { error in
-            if let error = error {
-                print("Failed to schedule notification: \(error)")
+
+        // ── Before start ─────────────────────────────────────────────
+        if let mins = settings.minutesBefore {
+            let content = UNMutableNotificationContent()
+            content.title = task.title
+            content.sound = .default
+
+            if let startTime = task.startTime {
+                content.body = task.description.isEmpty
+                    ? "Starting in \(mins) minute\(mins == 1 ? "" : "s")"
+                    : "\(task.description) — Starting in \(mins) minute\(mins == 1 ? "" : "s")"
+                if let fireDate = calendar.date(byAdding: .minute, value: -mins, to: startTime),
+                   fireDate > Date() {
+                    scheduleRequest(id: "\(task.id.uuidString)_before", content: content,
+                                    fireDate: fireDate, calendar: calendar)
+                }
+            } else {
+                // Todo without start time: morning reminder at 8 AM
+                content.body = task.description.isEmpty ? "Due today" : "\(task.description) — Due today"
+                if let fireDate = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: task.dueDate),
+                   fireDate > Date() {
+                    scheduleRequest(id: "\(task.id.uuidString)_before", content: content,
+                                    fireDate: fireDate, calendar: calendar)
+                }
             }
         }
+
+        // ── On start ─────────────────────────────────────────────────
+        if settings.notifyOnStart, let startTime = task.startTime, startTime > Date() {
+            let content = UNMutableNotificationContent()
+            content.title = "Starting now: \(task.title)"
+            content.body = task.description.isEmpty ? "Time to begin!" : task.description
+            content.sound = .default
+            scheduleRequest(id: "\(task.id.uuidString)_start", content: content,
+                            fireDate: startTime, calendar: calendar)
+        }
+
+        // ── On finish ────────────────────────────────────────────────
+        if settings.notifyOnFinish, let endTime = task.endTime, endTime > Date() {
+            let content = UNMutableNotificationContent()
+            content.title = "Time's up: \(task.title)"
+            content.body = "Did you finish? Mark it complete if you're done!"
+            content.sound = .default
+            scheduleRequest(id: "\(task.id.uuidString)_finish", content: content,
+                            fireDate: endTime, calendar: calendar)
+        }
     }
-    
-    /// Cancel the notification for a specific task
+
+    private func scheduleRequest(id: String, content: UNMutableNotificationContent,
+                                 fireDate: Date, calendar: Calendar) {
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        center.add(request) { error in
+            if let error { print("Failed to schedule '\(id)': \(error)") }
+        }
+    }
+
+    /// Cancel all notifications (before/start/finish) for a specific task
     func cancelNotification(for task: TodoTask) {
-        center.removePendingNotificationRequests(withIdentifiers: [task.id.uuidString])
+        center.removePendingNotificationRequests(withIdentifiers: [
+            task.id.uuidString,
+            "\(task.id.uuidString)_before",
+            "\(task.id.uuidString)_start",
+            "\(task.id.uuidString)_finish"
+        ])
     }
-    
+
     /// Cancel all scheduled notifications
     func cancelAllNotifications() {
         center.removeAllPendingNotificationRequests()
     }
-    
-    /// Reschedule notifications for all active tasks
+
+    /// Reschedule notifications for all active tasks using current settings
     func rescheduleAll(tasks: [TodoTask]) {
         cancelAllNotifications()
+        guard settings.isEnabled else { return }
         for task in tasks where !task.isCompleted {
             scheduleNotification(for: task)
         }
     }
-    
+
     // MARK: - Smart Suggestion Notifications
-    
+
     private let dailySuggestionKey = "LastDailySuggestionDate"
-    private let maxDailySuggestions = 3
-    private var dailySuggestionCount = 0
-    
-    /// Schedule a morning planning suggestion based on user's typical open time
+
     func scheduleMorningSuggestion(tasks: [TodoTask]) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        
-        // Don't schedule if already sent today
         if let lastDate = UserDefaults.standard.object(forKey: dailySuggestionKey) as? Date,
-           calendar.isDate(lastDate, inSameDayAs: today) {
-            return
-        }
-        
+           calendar.isDate(lastDate, inSameDayAs: today) { return }
+
         let todayTasks = tasks.filter {
             !$0.isCompleted && calendar.isDate($0.dueDate, inSameDayAs: today)
         }
         guard !todayTasks.isEmpty else { return }
-        
+
         let content = UNMutableNotificationContent()
         content.title = "Today's Plan"
         content.body = "You have \(todayTasks.count) tasks today. Start with the most important one!"
         content.sound = .default
-        
-        // Schedule for user's typical open time minus 5 min, or 8:00 AM default
+
         let profile = UserProfileViewModel.shared.profile
-        let openHour = profile.avgAppOpenHour ?? 8
-        let fireHour = max(6, openHour)
-        
+        let fireHour = max(6, profile.avgAppOpenHour ?? 8)
+
         guard let fireDate = calendar.date(bySettingHour: fireHour, minute: 0, second: 0, of: today),
               fireDate > Date() else {
             UserDefaults.standard.set(today, forKey: dailySuggestionKey)
             return
         }
-        
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
         let request = UNNotificationRequest(
             identifier: "morning_suggestion_\(today.timeIntervalSince1970)",
-            content: content,
-            trigger: trigger
-        )
-        
+            content: content, trigger: trigger)
         center.add(request) { [weak self] error in
-            if error == nil {
-                UserDefaults.standard.set(today, forKey: self?.dailySuggestionKey ?? "")
-            }
+            if error == nil { UserDefaults.standard.set(today, forKey: self?.dailySuggestionKey ?? "") }
         }
     }
-    
-    /// Schedule overdue task reminder
+
     func scheduleOverdueReminder(tasks: [TodoTask]) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        
-        let overdueTasks = tasks.filter {
-            !$0.isCompleted && $0.dueDate < today
-        }
-        guard overdueTasks.count >= 2 else { return }
-        
+        let overdue = tasks.filter { !$0.isCompleted && $0.dueDate < today }
+        guard overdue.count >= 2 else { return }
+
         let content = UNMutableNotificationContent()
         content.title = "Tasks Need Attention"
-        content.body = "You have \(overdueTasks.count) overdue tasks. Would you like to reschedule them?"
+        content.body = "You have \(overdue.count) overdue tasks. Would you like to reschedule them?"
         content.sound = .default
-        
-        // Schedule for 2 PM today
+
         guard let fireDate = calendar.date(bySettingHour: 14, minute: 0, second: 0, of: Date()),
               fireDate > Date() else { return }
-        
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        let request = UNNotificationRequest(
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        center.add(UNNotificationRequest(
             identifier: "overdue_reminder_\(today.timeIntervalSince1970)",
-            content: content,
-            trigger: trigger
-        )
-        
-        center.add(request)
+            content: content, trigger: trigger))
     }
-    
-    /// Schedule a productivity peak reminder
+
     func schedulePeakHourReminder(tasks: [TodoTask]) {
         let profile = UserProfileViewModel.shared.profile
         guard !profile.peakProductivityHours.isEmpty else { return }
-        
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let peakHour = profile.peakProductivityHours[0]
-        
-        // Check if there are important uncompleted tasks
-        let importantTasks = tasks.filter {
+        let important = tasks.filter {
             !$0.isCompleted && calendar.isDate($0.dueDate, inSameDayAs: today) && $0.priority == .high
         }
-        guard !importantTasks.isEmpty else { return }
-        
-        guard let fireDate = calendar.date(bySettingHour: peakHour, minute: 0, second: 0, of: Date()),
+        guard !important.isEmpty else { return }
+
+        guard let fireDate = calendar.date(bySettingHour: profile.peakProductivityHours[0],
+                                           minute: 0, second: 0, of: Date()),
               fireDate > Date() else { return }
-        
         let content = UNMutableNotificationContent()
         content.title = "Peak Productivity Time"
-        content.body = "Now is your most productive hour! You have \(importantTasks.count) important tasks to tackle."
+        content.body = "Now is your most productive hour! You have \(important.count) important tasks."
         content.sound = .default
-        
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        
-        let request = UNNotificationRequest(
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        center.add(UNNotificationRequest(
             identifier: "peak_hour_\(today.timeIntervalSince1970)",
-            content: content,
-            trigger: trigger
-        )
-        
-        center.add(request)
+            content: content, trigger: trigger))
     }
-    
-    /// Schedule all smart notifications for the day
+
     func scheduleSmartNotifications(tasks: [TodoTask]) {
         scheduleMorningSuggestion(tasks: tasks)
         scheduleOverdueReminder(tasks: tasks)
