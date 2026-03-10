@@ -359,6 +359,22 @@ struct UserPreferencesView: View {
                                             .font(AppTheme.Typography.labelSmall)
                                             .foregroundColor(AppTheme.secondaryTeal)
                                     }
+                                    
+                                    if pref.isTemporary {
+                                        Text("Temporary")
+                                            .font(AppTheme.Typography.labelSmall)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 1)
+                                            .background(AppTheme.accentCoral.opacity(0.8))
+                                            .clipShape(Capsule())
+                                    }
+                                    
+                                    if let expires = pref.expiresAt {
+                                        Text("expires \(expires, format: .dateTime.month().day())")
+                                            .font(AppTheme.Typography.labelSmall)
+                                            .foregroundColor(AppTheme.textTertiary)
+                                    }
                                 }
                             }
                             

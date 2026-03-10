@@ -213,6 +213,7 @@ class ChatService: ObservableObject {
         let tasksContext = formatTasksForContext(windowTasks, dateFormatter: dateFormatter, timeFormatter: timeFormatter)
         let beaverPersona = BeaverPersonality.shared.personaPrompt(tasks: todoViewModel?.todos ?? [])
         let chatMemory = ChatMemoryStore.shared.generateMemorySummary()
+        let behaviorProfile = BehaviorAnalyzer.shared.generateProfileSummary()
 
         return """
         You are Beaver, a warm and playful schedule assistant in a task management app.
@@ -225,6 +226,7 @@ class ChatService: ObservableObject {
         Current date: \(today) (\(weekday))  
         Current time: \(currentTime)  
         \(chatMemory.isEmpty ? "" : chatMemory)
+        \(behaviorProfile.contains("Not enough data") ? "" : behaviorProfile)
 
         ## Existing Tasks (Editable)
         The following tasks exist and may need to be kept, moved, updated, or deleted depending on user request or AI adjustment:
@@ -495,8 +497,15 @@ class ChatService: ObservableObject {
                 pendingActions = []
             }
             
-            // Extract user preferences for long-term memory
-            ChatMemoryStore.shared.extractPreferences(from: userMessage, aiResponse: fullResponse)
+            // Extract user preferences for long-term memory (async, non-blocking)
+            let capturedUserMessage = userMessage
+            let capturedResponse = fullResponse
+            Task.detached(priority: .utility) {
+                await ChatMemoryStore.shared.extractPreferencesWithAI(
+                    userMessage: capturedUserMessage,
+                    aiResponse: capturedResponse
+                )
+            }
             
             // Final clean display text
             if streamingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
