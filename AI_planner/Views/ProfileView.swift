@@ -196,11 +196,11 @@ struct ProfileView: View {
             }
             
             VStack(spacing: AppTheme.Spacing.xs) {
-                Text(authManager.userEmail ?? "AI Planner User")
+                Text(ProfileManager.shared.activeProfile.name)
                     .font(AppTheme.Typography.headlineSmall)
                     .foregroundColor(AppTheme.textPrimary)
                 
-                Text("Organize your schedule with intelligence")
+                Text(authManager.userEmail ?? "AI Planner User")
                     .font(AppTheme.Typography.bodySmall)
                     .foregroundColor(AppTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -365,26 +365,72 @@ struct ProfileView: View {
                 Divider()
                     .padding(.leading, 48)
                 
-                // Notifications Toggle
-                SettingsToggleRow(
-                    icon: "bell.fill",
-                    label: "Notifications",
-                    subtitle: notificationsEnabled ? "Enabled" : "Disabled",
-                    isOn: $notificationsEnabled
-                )
-                .onChange(of: notificationsEnabled) { _, newValue in
-                    if newValue {
-                        Task {
-                            let granted = await NotificationManager.shared.requestAuthorization()
-                            if granted {
-                                NotificationManager.shared.rescheduleAll(tasks: viewModel.todos)
-                            } else {
-                                notificationsEnabled = false
-                            }
+                // Notifications → NavigationLink to settings page
+                NavigationLink {
+                    NotificationSettingsView(viewModel: viewModel)
+                } label: {
+                    HStack(spacing: AppTheme.Spacing.md) {
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.primaryDeepIndigo)
+                            .frame(width: 28, height: 28)
+                            .background(AppTheme.primaryDeepIndigo.opacity(0.1))
+                            .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notifications")
+                                .font(AppTheme.Typography.bodyMedium)
+                                .foregroundColor(AppTheme.textPrimary)
+                            Text(notificationsEnabled
+                                 ? subtitleForNotificationSettings()
+                                 : "Disabled")
+                                .font(AppTheme.Typography.labelSmall)
+                                .foregroundColor(AppTheme.textSecondary)
                         }
-                    } else {
-                        NotificationManager.shared.cancelAllNotifications()
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.textTertiary)
                     }
+                    .padding(.horizontal, AppTheme.Spacing.lg)
+                    .padding(.vertical, AppTheme.Spacing.md)
+                }
+                
+                Divider()
+                    .padding(.leading, 48)
+                
+                // Profiles row
+                NavigationLink {
+                    ProfileManagementView()
+                } label: {
+                    HStack(spacing: AppTheme.Spacing.md) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.accentGold)
+                            .frame(width: 28, height: 28)
+                            .background(AppTheme.accentGold.opacity(0.1))
+                            .clipShape(Circle())
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Profiles")
+                                .font(AppTheme.Typography.bodyMedium)
+                                .foregroundColor(AppTheme.textPrimary)
+                            
+                            Text(ProfileManager.shared.activeProfile.name)
+                                .font(AppTheme.Typography.labelSmall)
+                                .foregroundColor(AppTheme.textTertiary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+                    .padding(.horizontal, AppTheme.Spacing.lg)
+                    .padding(.vertical, AppTheme.Spacing.md)
                 }
                 
                 Divider()
@@ -641,6 +687,15 @@ struct ProfileView: View {
     private func checkNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsEnabled = settings.authorizationStatus == .authorized
+    }
+
+    private func subtitleForNotificationSettings() -> String {
+        let s = NotificationManager.shared.settings
+        var parts: [String] = []
+        if let mins = s.minutesBefore { parts.append("\(mins)m before") }
+        if s.notifyOnStart  { parts.append("on start") }
+        if s.notifyOnFinish { parts.append("on finish") }
+        return parts.isEmpty ? "Enabled" : parts.joined(separator: " · ")
     }
 }
 

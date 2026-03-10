@@ -10,8 +10,8 @@ import SwiftUI
 @main
 struct AI_plannerApp: App {
     @State private var authManager = AuthManager()
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    
+    @StateObject private var profileManager = ProfileManager.shared
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -33,11 +33,11 @@ struct AI_plannerApp: App {
                         }
                     }
                 } else if authManager.isSignedIn {
-                    if hasCompletedOnboarding {
+                    if profileManager.hasCompletedOnboarding {
                         ContentView(authManager: authManager)
                     } else {
                         OnboardingView {
-                            hasCompletedOnboarding = true
+                            profileManager.completeOnboarding()
                         }
                     }
                 } else {

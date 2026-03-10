@@ -62,12 +62,20 @@ struct FeedbackEntry: Identifiable, Codable {
 
 final class FeedbackStore {
     static let shared = FeedbackStore()
-    private let storageKey = "BetaFeedbackEntries"
+    private let baseStorageKey = "BetaFeedbackEntries"
+    private var storageKey: String { ProfileManager.activeScopedKey(baseStorageKey) }
 
     private(set) var entries: [FeedbackEntry] = []
 
     private init() {
         load()
+        NotificationCenter.default.addObserver(
+            forName: .profileDidSwitch,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.load()
+        }
     }
 
     // MARK: - Save
@@ -75,6 +83,8 @@ final class FeedbackStore {
     func submit(_ entry: FeedbackEntry) {
         entries.append(entry)
         persist()
+        // Also upload to Notion so the developer receives it in the cloud
+        FeedbackUploader.shared.upload(entry)
     }
 
     // MARK: - Export as JSON string (for developer copy/paste)

@@ -486,7 +486,9 @@ struct UserPreferencesView: View {
     
     private func resetAllPreferences() {
         ChatMemoryStore.shared.clearAll()
-        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        let key = ProfileManager.activeScopedKey("hasCompletedOnboarding")
+                        UserDefaults.standard.set(false, forKey: key)
+                        ProfileManager.shared.hasCompletedOnboarding = false
         
         // Reset local state
         wakeUpTime = Calendar.current.date(from: DateComponents(hour: 7, minute: 0)) ?? Date()

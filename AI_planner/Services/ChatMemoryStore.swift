@@ -102,8 +102,10 @@ private struct ExtractedPreference: Codable {
 class ChatMemoryStore {
     static let shared = ChatMemoryStore()
     
-    private let storageKey = "ChatMemoryPreferences"
-    private let structuredKey = "StructuredUserPreferences"
+    private let baseStorageKey = "ChatMemoryPreferences"
+    private let baseStructuredKey = "StructuredUserPreferences"
+    private var storageKey: String { ProfileManager.activeScopedKey(baseStorageKey) }
+    private var structuredKey: String { ProfileManager.activeScopedKey(baseStructuredKey) }
     private let maxPreferences = 50
     
     private(set) var preferences: [UserPreference] = []
@@ -113,6 +115,16 @@ class ChatMemoryStore {
         loadPreferences()
         loadStructuredPreferences()
         purgeExpired()
+        // Reload when profile switches
+        NotificationCenter.default.addObserver(
+            forName: .profileDidSwitch,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadPreferences()
+            self?.loadStructuredPreferences()
+            self?.purgeExpired()
+        }
     }
     
     // MARK: - AI-Based Preference Extraction
