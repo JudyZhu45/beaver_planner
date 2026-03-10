@@ -7,12 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D981203F2F4F6C9C002C5CB1 /* Resume_AI_Planner.md in Resources */ = {isa = PBXBuildFile; fileRef = D981203E2F4F6C9C002C5CB1 /* Resume_AI_Planner.md */; };
+		D91882E42F5F053A00E42931 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = D91882E32F5F053A00E42931 /* Secrets.xcconfig */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
-		D981203E2F4F6C9C002C5CB1 /* Resume_AI_Planner.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Resume_AI_Planner.md; sourceTree = "<group>"; };
+		D91882E32F5F053A00E42931 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		D99AFE342F470F8400881929 /* AI_planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AI_planner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -49,8 +48,7 @@
 				D99AFE352F470F8400881929 /* Products */,
 				98E102A1C0B0A9252DFF10E7 /* AmplifyConfig */,
 				D9FBB1362F4B79610091F21E /* Frameworks */,
-				D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */,
-				D981203E2F4F6C9C002C5CB1 /* Resume_AI_Planner.md */,
+				D91882E32F5F053A00E42931 /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -135,7 +133,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D981203F2F4F6C9C002C5CB1 /* Resume_AI_Planner.md in Resources */,
+				D91882E42F5F053A00E42931 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -154,7 +152,7 @@
 /* Begin XCBuildConfiguration section */
 		D99AFE3D2F470F8500881929 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */;
+			baseConfigurationReference = D91882E32F5F053A00E42931 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -218,7 +216,7 @@
 		};
 		D99AFE3E2F470F8500881929 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */;
+			baseConfigurationReference = D91882E32F5F053A00E42931 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -275,7 +273,6 @@
 		};
 		D99AFE402F470F8500881929 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -309,7 +306,6 @@
 		};
 		D99AFE412F470F8500881929 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D981203C2F4E5DC7002C5CB1 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

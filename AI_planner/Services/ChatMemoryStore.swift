@@ -9,31 +9,58 @@ import Foundation
 
 // MARK: - User Preference Memory
 
-/// A single preference extracted from conversation
 struct UserPreference: Codable, Identifiable {
     let id: UUID
-    let category: PreferenceCategory
-    let content: String          // The preference itself
-    let source: String           // What user said that led to this
-    let createdAt: Date
-    var confirmedCount: Int      // How many times this preference was reinforced
+    var category: PreferenceCategory
+    var content: String
+    var source: String
+    var createdAt: Date
+    var updatedAt: Date
+    var confirmedCount: Int
+    var isTemporary: Bool
+    var expiresAt: Date?
     
-    init(category: PreferenceCategory, content: String, source: String) {
+    init(category: PreferenceCategory, content: String, source: String,
+         isTemporary: Bool = false, ttlDays: Int? = nil) {
         self.id = UUID()
         self.category = category
         self.content = content
         self.source = source
         self.createdAt = Date()
+        self.updatedAt = Date()
         self.confirmedCount = 1
+        self.isTemporary = isTemporary
+        if isTemporary {
+            self.expiresAt = Calendar.current.date(
+                byAdding: .day, value: ttlDays ?? 7, to: Date()
+            )
+        } else {
+            self.expiresAt = nil
+        }
+    }
+    
+    // Backward-compatible decoding for existing data
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        category = try container.decode(PreferenceCategory.self, forKey: .category)
+        content = try container.decode(String.self, forKey: .content)
+        source = try container.decode(String.self, forKey: .source)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        confirmedCount = try container.decode(Int.self, forKey: .confirmedCount)
+        // New fields — old data may not have these
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
+        isTemporary = try container.decodeIfPresent(Bool.self, forKey: .isTemporary) ?? false
+        expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
     }
 }
 
 enum PreferenceCategory: String, Codable {
-    case schedule       // Schedule preferences: "doesn't like waking early", "prefers afternoon exercise"
-    case taskHabit      // Task habits: "likes segmented study", "gym on Wed/Fri"
-    case lifestyle      // Lifestyle: "no work on weekends", "1-hour lunch break"
-    case personality    // Personality: "prefers concise replies", "don't use too many emojis"
-    case constraint     // Constraints: "has class Tue/Thu", "work starts at 9 AM"
+    case schedule       // Schedule preferences
+    case taskHabit      // Task habits
+    case lifestyle      // Lifestyle
+    case personality    // Personality / communication style
+    case constraint     // Hard constraints
 }
 
 // MARK: - Structured Preferences (from onboarding / manual editing)
@@ -43,15 +70,31 @@ struct StructuredPreferences: Codable {
     var workStartTime: Date?
     var workEndTime: Date?
     var hasLunchBreak: Bool
-    var preferredEventTypes: [String]   // e.g. ["Gym", "Study Session"]
-    var preferredDuration: String?      // "short" / "medium" / "long"
-    var weekendPreference: String?      // "rest" / "work" / "flexible"
-    var constraints: String?            // Free-form text
+    var preferredEventTypes: [String]
+    var preferredDuration: String?
+    var weekendPreference: String?
+    var constraints: String?
     
     init() {
         self.hasLunchBreak = false
         self.preferredEventTypes = []
     }
+}
+
+// MARK: - AI Extraction Models
+
+private struct AIExtractionResult: Codable {
+    let preferences: [ExtractedPreference]
+}
+
+private struct ExtractedPreference: Codable {
+    let category: String
+    let content: String
+    let source: String
+    let is_temporary: Bool
+    let ttl_days: Int?
+    let replaces_id: String?
+    let reinforces_id: String?
 }
 
 // MARK: - Chat Memory Store
@@ -61,7 +104,7 @@ class ChatMemoryStore {
     
     private let storageKey = "ChatMemoryPreferences"
     private let structuredKey = "StructuredUserPreferences"
-    private let maxPreferences = 30
+    private let maxPreferences = 50
     
     private(set) var preferences: [UserPreference] = []
     private(set) var structuredPreferences = StructuredPreferences()
@@ -69,35 +112,164 @@ class ChatMemoryStore {
     private init() {
         loadPreferences()
         loadStructuredPreferences()
+        purgeExpired()
     }
     
-    // MARK: - Add Preference
+    // MARK: - AI-Based Preference Extraction
     
-    func addPreference(_ preference: UserPreference) {
-        // Check for duplicates — if similar preference exists, reinforce it
-        if let existingIndex = preferences.firstIndex(where: {
-            $0.category == preference.category && isSimilar($0.content, preference.content)
-        }) {
-            preferences[existingIndex].confirmedCount += 1
-            savePreferences()
+    /// Call after each conversation turn. Runs asynchronously, does not block chat.
+    func extractPreferencesWithAI(
+        userMessage: String,
+        aiResponse: String
+    ) async {
+        purgeExpired()
+        
+        let existingJSON = buildExistingPreferencesJSON()
+        
+        let prompt = """
+        You are a preference extraction engine for a scheduling app.
+        
+        Analyze the conversation below and extract any user preferences or habits mentioned.
+        
+        EXISTING PREFERENCES:
+        \(existingJSON)
+        
+        CONVERSATION:
+        User: \(userMessage)
+        Assistant: \(aiResponse)
+        
+        Rules:
+        1. Output ONLY a JSON object, nothing else.
+        2. Extract preferences about: schedule habits, task habits, lifestyle, personality, constraints.
+        3. For each preference, determine if it CONFLICTS with an existing one. If so, set "replaces_id" to the id of the old preference.
+        4. Determine if the preference is TEMPORARY (exam week, vacation, illness, short-term plan, etc.) or PERMANENT.
+        5. For temporary preferences, set ttl_days (default 7, max 30).
+        6. If the user CONFIRMS or REINFORCES an existing preference, set "reinforces_id" to its id instead.
+        7. If no new preferences found, return {"preferences": []}.
+        8. Do NOT extract trivial or one-off requests as preferences (e.g. "schedule a meeting tomorrow" is NOT a preference).
+        9. Only extract things that represent recurring habits, constraints, or lasting preferences.
+        
+        JSON shape:
+        {
+          "preferences": [
+            {
+              "category": "schedule|taskHabit|lifestyle|personality|constraint",
+              "content": "concise description of the preference",
+              "source": "the exact user quote that revealed this",
+              "is_temporary": false,
+              "ttl_days": null,
+              "replaces_id": "UUID string or null",
+              "reinforces_id": "UUID string or null"
+            }
+          ]
+        }
+        """
+        
+        let messages = [
+            KimiMessage(role: "system", content: prompt),
+            KimiMessage(role: "user", content: "Extract preferences from the conversation above.")
+        ]
+        
+        do {
+            let raw = try await AIAPIService.shared.sendChat(
+                messages: messages, temperature: 0.0
+            )
+            await MainActor.run {
+                processExtractionResult(raw)
+            }
+        } catch {
+            print("[Memory] AI extraction failed: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Process AI Extraction Result
+    
+    private func processExtractionResult(_ rawJSON: String) {
+        guard let jsonString = extractJSONObject(from: rawJSON),
+              let data = jsonString.data(using: .utf8),
+              let result = try? JSONDecoder().decode(
+                  AIExtractionResult.self, from: data
+              ) else {
+            print("[Memory] Failed to parse extraction result")
             return
         }
         
+        for extracted in result.preferences {
+            guard let category = PreferenceCategory(rawValue: extracted.category) else {
+                continue
+            }
+            
+            // Case 1: Reinforces existing preference
+            if let reinforcesIdStr = extracted.reinforces_id,
+               let reinforcesId = UUID(uuidString: reinforcesIdStr),
+               let index = preferences.firstIndex(where: { $0.id == reinforcesId }) {
+                preferences[index].confirmedCount += 1
+                preferences[index].updatedAt = Date()
+                // If reinforced enough times, promote temporary to permanent
+                if preferences[index].confirmedCount >= 3 && preferences[index].isTemporary {
+                    preferences[index].isTemporary = false
+                    preferences[index].expiresAt = nil
+                }
+                savePreferences()
+                continue
+            }
+            
+            // Case 2: Replaces conflicting preference
+            if let replacesIdStr = extracted.replaces_id,
+               let replacesId = UUID(uuidString: replacesIdStr) {
+                preferences.removeAll { $0.id == replacesId }
+            }
+            
+            // Case 3: Add new preference
+            let newPref = UserPreference(
+                category: category,
+                content: extracted.content,
+                source: extracted.source,
+                isTemporary: extracted.is_temporary,
+                ttlDays: extracted.ttl_days
+            )
+            addPreference(newPref)
+        }
+    }
+    
+    // MARK: - Add / Remove
+    
+    func addPreference(_ preference: UserPreference) {
         preferences.append(preference)
         
-        // Trim oldest if over limit
         if preferences.count > maxPreferences {
-            preferences.sort { $0.confirmedCount > $1.confirmedCount }
-            preferences = Array(preferences.prefix(maxPreferences))
+            // Remove oldest temporary first, then lowest-confirmed permanent
+            let temporary = preferences.filter { $0.isTemporary }
+                .sorted { $0.createdAt < $1.createdAt }
+            let permanent = preferences.filter { !$0.isTemporary }
+                .sorted { $0.confirmedCount < $1.confirmedCount }
+            
+            let prioritized = permanent + temporary
+            preferences = Array(prioritized.suffix(maxPreferences))
         }
         
         savePreferences()
     }
     
-    /// Remove a preference by ID
     func removePreference(id: UUID) {
         preferences.removeAll { $0.id == id }
         savePreferences()
+    }
+    
+    // MARK: - Purge Expired
+    
+    func purgeExpired() {
+        let now = Date()
+        let before = preferences.count
+        preferences.removeAll { pref in
+            if let expires = pref.expiresAt, expires < now {
+                return true
+            }
+            return false
+        }
+        if preferences.count != before {
+            savePreferences()
+        }
     }
     
     // MARK: - Query
@@ -106,8 +278,11 @@ class ChatMemoryStore {
         preferences.filter { $0.category == category }
     }
     
-    /// Generate a concise summary for AI system prompt injection
+    // MARK: - Generate Memory Summary for System Prompt
+    
     func generateMemorySummary() -> String {
+        purgeExpired()
+        
         var lines: [String] = []
         
         // 1. Structured preferences (from onboarding / manual settings)
@@ -118,16 +293,22 @@ class ChatMemoryStore {
         formatter.dateFormat = "HH:mm"
         
         if let wake = sp.wakeUpTime {
-            structuredLines.append("- [Schedule] Wake-up time: \(formatter.string(from: wake))")
+            structuredLines.append(
+                "- [Schedule] Wake-up time: \(formatter.string(from: wake))"
+            )
         }
         if let start = sp.workStartTime, let end = sp.workEndTime {
-            structuredLines.append("- [Constraint] Work/class hours: \(formatter.string(from: start))-\(formatter.string(from: end))")
+            structuredLines.append(
+                "- [Constraint] Work/class hours: \(formatter.string(from: start))-\(formatter.string(from: end))"
+            )
         }
         if sp.hasLunchBreak {
             structuredLines.append("- [Schedule] User takes a lunch break")
         }
         if !sp.preferredEventTypes.isEmpty {
-            structuredLines.append("- [Task Habit] Frequently scheduled types: \(sp.preferredEventTypes.joined(separator: ", "))")
+            structuredLines.append(
+                "- [Task Habit] Frequently scheduled types: \(sp.preferredEventTypes.joined(separator: ", "))"
+            )
         }
         if let duration = sp.preferredDuration {
             let durationText: String
@@ -137,7 +318,9 @@ class ChatMemoryStore {
             case "long": durationText = "Long tasks (over 1 hour)"
             default: durationText = duration
             }
-            structuredLines.append("- [Task Habit] Preferred task duration: \(durationText)")
+            structuredLines.append(
+                "- [Task Habit] Preferred task duration: \(durationText)"
+            )
         }
         if let weekend = sp.weekendPreference {
             let weekendText: String
@@ -158,106 +341,62 @@ class ChatMemoryStore {
             lines.append(contentsOf: structuredLines)
         }
         
-        // 2. Chat-extracted preferences
-        if !preferences.isEmpty {
+        // 2. AI-learned preferences — permanent
+        let permanent = preferences.filter { !$0.isTemporary }
+        let temporary = preferences.filter { $0.isTemporary }
+        
+        if !permanent.isEmpty {
             if !lines.isEmpty { lines.append("") }
-            lines.append("User Preference Memory (extracted from chat history):")
+            lines.append("Learned User Preferences:")
             
-            let grouped = Dictionary(grouping: preferences, by: \.category)
-            let categoryOrder: [PreferenceCategory] = [.constraint, .schedule, .taskHabit, .lifestyle, .personality]
+            let grouped = Dictionary(grouping: permanent, by: \.category)
+            let categoryOrder: [PreferenceCategory] = [
+                .constraint, .schedule, .taskHabit, .lifestyle, .personality
+            ]
             
             for category in categoryOrder {
                 guard let prefs = grouped[category], !prefs.isEmpty else { continue }
                 let label = categoryLabel(category)
                 let sorted = prefs.sorted { $0.confirmedCount > $1.confirmedCount }
-                for pref in sorted.prefix(3) {
-                    let reinforced = pref.confirmedCount > 1 ? " (mentioned multiple times)" : ""
+                for pref in sorted.prefix(5) {
+                    let reinforced = pref.confirmedCount > 1
+                        ? " (confirmed \(pref.confirmedCount)x)"
+                        : ""
                     lines.append("- [\(label)] \(pref.content)\(reinforced)")
                 }
+            }
+        }
+        
+        // 3. Temporary preferences
+        if !temporary.isEmpty {
+            if !lines.isEmpty { lines.append("") }
+            lines.append("Temporary Preferences (short-term):")
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MM/dd"
+            for pref in temporary {
+                let expiryStr = pref.expiresAt.map {
+                    " (expires \(dateFormatter.string(from: $0)))"
+                } ?? ""
+                lines.append(
+                    "- [\(categoryLabel(pref.category))] \(pref.content)\(expiryStr)"
+                )
             }
         }
         
         return lines.joined(separator: "\n")
     }
     
-    // MARK: - Extract Preferences from Conversation
-    
-    /// Analyze user message and extract potential preferences
-    func extractPreferences(from userMessage: String, aiResponse: String) {
-        let message = userMessage.lowercased()
-        
-        // Schedule preferences
-        let schedulePatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("don'?t.*like.*early", { _ in "User doesn't like waking up early — avoid scheduling tasks before 8 AM" }),
-            ("no.*morning", { _ in "User doesn't want tasks scheduled in the morning" }),
-            ("(like|prefer).*early", { _ in "User likes waking up early — morning tasks are OK" }),
-            ("no.*(evening|night)", { _ in "User doesn't want tasks scheduled in the evening" }),
-            ("lunch.*break", { _ in "User takes a lunch break — don't schedule tasks 12–2 PM" }),
-            ("(nap|afternoon.*rest)", { _ in "User takes afternoon naps — don't schedule midday tasks" }),
-        ]
-        
-        for (pattern, extractor) in schedulePatterns {
-            if matchesPattern(message, pattern: pattern), let content = extractor(message) {
-                addPreference(UserPreference(category: .schedule, content: content, source: userMessage))
-            }
-        }
-        
-        // Constraint patterns
-        let constraintPatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("(have|has).*class.*(mon|tue|wed|thu|fri|sat|sun)", { msg in extractConstraint(msg, prefix: "User") }),
-            ("work.*(from|at).*\\d", { msg in extractConstraint(msg, prefix: "User") }),
-            ("every.*(mon|tue|wed|thu|fri|sat|sun)", { msg in extractWeeklyPattern(msg) }),
-            ("fixed.*schedule", { msg in extractConstraint(msg, prefix: "User has a fixed schedule: ") }),
-        ]
-        
-        for (pattern, extractor) in constraintPatterns {
-            if matchesPattern(message, pattern: pattern), let content = extractor(userMessage) {
-                addPreference(UserPreference(category: .constraint, content: content, source: userMessage))
-            }
-        }
-        
-        // Task habit patterns
-        let habitPatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("study.*(segment|chunk|block)", { _ in "User prefers studying in shorter segments" }),
-            ("(like|prefer).*1.*hour", { _ in "User prefers 1-hour task durations" }),
-            ("(don'?t|no).*too.*long", { _ in "User doesn't like long individual tasks" }),
-            ("pomodoro", { _ in "User uses the Pomodoro technique — 25 min work + 5 min break" }),
-        ]
-        
-        for (pattern, extractor) in habitPatterns {
-            if matchesPattern(message, pattern: pattern), let content = extractor(message) {
-                addPreference(UserPreference(category: .taskHabit, content: content, source: userMessage))
-            }
-        }
-        
-        // Lifestyle patterns
-        let lifestylePatterns: [(pattern: String, extractor: (String) -> String?)] = [
-            ("weekend.*(no|don'?t).*(work|study)", { _ in "User doesn't want work/study scheduled on weekends" }),
-            ("weekend.*rest", { _ in "User prefers to rest on weekends" }),
-            ("weekend.*(exercise|gym|workout)", { _ in "User likes to exercise/work out on weekends" }),
-        ]
-        
-        for (pattern, extractor) in lifestylePatterns {
-            if matchesPattern(message, pattern: pattern), let content = extractor(message) {
-                addPreference(UserPreference(category: .lifestyle, content: content, source: userMessage))
-            }
-        }
-    }
-    
     // MARK: - Structured Preferences Management
     
-    /// Save structured preferences from onboarding or manual editing
     func setStructuredPreferences(_ prefs: StructuredPreferences) {
         structuredPreferences = prefs
         saveStructuredPreferences()
     }
     
-    /// Get current structured preferences for pre-populating UI
     func getStructuredPreferences() -> StructuredPreferences {
         return structuredPreferences
     }
     
-    /// Clear all preferences (both structured and chat-extracted)
     func clearAll() {
         preferences.removeAll()
         structuredPreferences = StructuredPreferences()
@@ -265,37 +404,67 @@ class ChatMemoryStore {
         saveStructuredPreferences()
     }
     
-    private func saveStructuredPreferences() {
-        if let encoded = try? JSONEncoder().encode(structuredPreferences) {
-            UserDefaults.standard.set(encoded, forKey: structuredKey)
-        }
-    }
-    
-    private func loadStructuredPreferences() {
-        if let data = UserDefaults.standard.data(forKey: structuredKey),
-           let decoded = try? JSONDecoder().decode(StructuredPreferences.self, from: data) {
-            structuredPreferences = decoded
-        }
-    }
-    
     // MARK: - Helpers
     
-    private func matchesPattern(_ text: String, pattern: String) -> Bool {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-            return text.contains(pattern)
+    private func buildExistingPreferencesJSON() -> String {
+        guard !preferences.isEmpty else { return "[]" }
+        
+        let items = preferences.map { pref -> [String: Any] in
+            var dict: [String: Any] = [
+                "id": pref.id.uuidString,
+                "category": pref.category.rawValue,
+                "content": pref.content,
+                "is_temporary": pref.isTemporary
+            ]
+            if let expires = pref.expiresAt {
+                let df = DateFormatter()
+                df.dateFormat = "yyyy-MM-dd"
+                dict["expires"] = df.string(from: expires)
+            }
+            return dict
         }
-        let range = NSRange(text.startIndex..., in: text)
-        return regex.firstMatch(in: text, range: range) != nil
+        
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: items, options: [.prettyPrinted]
+        ) else { return "[]" }
+        
+        return String(data: data, encoding: .utf8) ?? "[]"
     }
     
-    private func isSimilar(_ a: String, _ b: String) -> Bool {
-        // Simple similarity: check if one contains the other or they share > 50% characters
-        if a.contains(b) || b.contains(a) { return true }
-        let setA = Set(a)
-        let setB = Set(b)
-        let intersection = setA.intersection(setB)
-        let union = setA.union(setB)
-        return !union.isEmpty && Double(intersection.count) / Double(union.count) > 0.7
+    private func extractJSONObject(from text: String) -> String? {
+        guard let start = text.firstIndex(of: "{") else { return nil }
+        
+        var depth = 0
+        var inString = false
+        var escaped = false
+        
+        for index in text[start...].indices {
+            let char = text[index]
+            
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if char == "\\" {
+                    escaped = true
+                } else if char == "\"" {
+                    inString = false
+                }
+                continue
+            }
+            
+            if char == "\"" {
+                inString = true
+            } else if char == "{" {
+                depth += 1
+            } else if char == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return String(text[start...index])
+                }
+            }
+        }
+        
+        return nil
     }
     
     private func categoryLabel(_ category: PreferenceCategory) -> String {
@@ -316,26 +485,25 @@ class ChatMemoryStore {
     
     private func loadPreferences() {
         if let data = UserDefaults.standard.data(forKey: storageKey),
-           let decoded = try? JSONDecoder().decode([UserPreference].self, from: data) {
+           let decoded = try? JSONDecoder().decode(
+               [UserPreference].self, from: data
+           ) {
             preferences = decoded
         }
     }
-}
-
-// MARK: - Free Functions for Pattern Extraction
-
-private func extractConstraint(_ message: String, prefix: String) -> String? {
-    // Just return the user's message as the constraint description
-    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return nil }
-    if trimmed.count > 50 {
-        return "\(prefix)\(String(trimmed.prefix(50)))..."
+    
+    private func saveStructuredPreferences() {
+        if let encoded = try? JSONEncoder().encode(structuredPreferences) {
+            UserDefaults.standard.set(encoded, forKey: structuredKey)
+        }
     }
-    return "\(prefix)\(trimmed)"
-}
-
-private func extractWeeklyPattern(_ message: String) -> String? {
-    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return nil }
-    return "User's weekly schedule habit: \(trimmed.count > 50 ? String(trimmed.prefix(50)) + "..." : trimmed)"
+    
+    private func loadStructuredPreferences() {
+        if let data = UserDefaults.standard.data(forKey: structuredKey),
+           let decoded = try? JSONDecoder().decode(
+               StructuredPreferences.self, from: data
+           ) {
+            structuredPreferences = decoded
+        }
+    }
 }

@@ -95,6 +95,12 @@ struct AIChatView: View {
                                     .transition(.opacity.combined(with: .scale))
                             }
                             
+                            // Quick prompts — show when no messages
+                            if showQuickPrompts {
+                                quickPromptsView
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                            
                             // Invisible anchor at the very bottom
                             Color.clear
                                 .frame(height: 1)
@@ -236,85 +242,10 @@ struct AIChatView: View {
         .padding(.top, AppTheme.Spacing.md)
     }
     
-    // MARK: - Bottom Container (Prompts + Input)
+    // MARK: - Bottom Container (Input)
     
     private var bottomContainerView: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .bottom, spacing: AppTheme.Spacing.sm) {
-                ZStack(alignment: .topLeading) {
-                    // Placeholder
-                    if inputText.isEmpty {
-                        Text(speechService.isRecording ? "Listening..." : "Ask me anything...")
-                            .font(AppTheme.Typography.bodyMedium)
-                            .foregroundColor(speechService.isRecording ? AppTheme.accentCoral : AppTheme.textTertiary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 8)
-                    }
-                    
-                    TextEditor(text: $inputText)
-                        .font(AppTheme.Typography.bodyMedium)
-                        .foregroundColor(AppTheme.textPrimary)
-                        .focused($isInputFocused)
-                        .scrollContentBackground(.hidden)
-                        .background(Color.clear)
-                        .frame(minHeight: 36, maxHeight: 120)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                
-                // Microphone button
-                Button {
-                    Task {
-                        await speechService.toggleRecording()
-                    }
-                } label: {
-                    Image(systemName: speechService.isRecording ? "mic.fill" : "mic")
-                        .font(.system(size: 20))
-                        .foregroundColor(
-                            speechService.isRecording ? AppTheme.accentCoral : AppTheme.textSecondary
-                        )
-                        .frame(width: 38, height: 38)
-                        .background(
-                            Circle()
-                                .fill(speechService.isRecording ? AppTheme.accentCoral.opacity(0.12) : AppTheme.bgTertiary.opacity(0.75))
-                        )
-                        .scaleEffect(micPulse ? 1.15 : 1.0)
-                }
-                .padding(.bottom, 2)
-                .onChange(of: speechService.isRecording) { _, recording in
-                    withAnimation(recording
-                        ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true)
-                        : .default
-                    ) {
-                        micPulse = recording
-                    }
-                }
-                
-                // Send button
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(
-                            canSend
-                                ? LinearGradient(
-                                    colors: [AppTheme.primaryDeepIndigo, AppTheme.accentGold],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                : LinearGradient(
-                                    colors: [AppTheme.textTertiary, AppTheme.textTertiary],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                        )
-                        .scaleEffect(canSend ? 1.0 : 0.94)
-                }
-                .disabled(!canSend)
-                .padding(.bottom, 2)
-            }
-            
-            // Text Input Area
             inputAreaView
         }
         .background(
@@ -327,7 +258,7 @@ struct AIChatView: View {
                 endPoint: .bottom
             )
             .shadow(color: AppTheme.shadowColor, radius: 8, x: 0, y: -4)
-            .ignoresSafeArea(edges: .bottom) // Extends the background gradient behind the home bar
+            .ignoresSafeArea(edges: .bottom)
         )
     }
     
@@ -580,7 +511,7 @@ struct AIChatView: View {
     // MARK: - Quick Prompts
     
     private var showQuickPrompts: Bool {
-        chatViewModel.messages.count <= 1 && !chatViewModel.isTyping
+        chatViewModel.messages.isEmpty && !chatViewModel.isTyping
     }
     
     private var quickPromptsView: some View {
